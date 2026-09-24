@@ -1,0 +1,13 @@
+__gmon_start__
+__libc_start_main@GLIBC_2.34
+abort@GLIBC_2.17
+fclose@GLIBC_2.17
+fgets@GLIBC_2.17
+fopen@GLIBC_2.17
+printf@GLIBC_2.17
+putc@GLIBC_2.17
+puts@GLIBC_2.17
+snprintf@GLIBC_2.17
+strcmp@GLIBC_2.17
+strlen@GLIBC_2.17
+system@GLIBC_2.17

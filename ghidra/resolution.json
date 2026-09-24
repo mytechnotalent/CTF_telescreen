@@ -1,0 +1,462 @@
+[
+  {
+    "addr": 4196040,
+    "ghidra": "_DT_INIT",
+    "file": "004006c8__DT_INIT.c",
+    "kind": "runtime",
+    "name": "_init",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196080,
+    "ghidra": "FUN_004006f0",
+    "file": "004006f0_FUN_004006f0.c",
+    "kind": "runtime",
+    "name": "<.plt> PLT0 resolver",
+    "module": "-",
+    "evidence": "R3: linker-provided lazy-binding trampoline"
+  },
+  {
+    "addr": 4196112,
+    "ghidra": "strlen",
+    "file": "00400710_strlen.c",
+    "kind": "import",
+    "name": "strlen",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196128,
+    "ghidra": "__libc_start_main",
+    "file": "00400720___libc_start_main.c",
+    "kind": "import",
+    "name": "__libc_start_main",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196144,
+    "ghidra": "putc",
+    "file": "00400730_putc.c",
+    "kind": "import",
+    "name": "putc",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196160,
+    "ghidra": "snprintf",
+    "file": "00400740_snprintf.c",
+    "kind": "import",
+    "name": "snprintf",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196176,
+    "ghidra": "fclose",
+    "file": "00400750_fclose.c",
+    "kind": "import",
+    "name": "fclose",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196192,
+    "ghidra": "fopen",
+    "file": "00400760_fopen.c",
+    "kind": "import",
+    "name": "fopen",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196208,
+    "ghidra": "system",
+    "file": "00400770_system.c",
+    "kind": "import",
+    "name": "system",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196224,
+    "ghidra": "__gmon_start__",
+    "file": "00400780___gmon_start__.c",
+    "kind": "import",
+    "name": "__gmon_start__",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196240,
+    "ghidra": "abort",
+    "file": "00400790_abort.c",
+    "kind": "import",
+    "name": "abort",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196256,
+    "ghidra": "puts",
+    "file": "004007a0_puts.c",
+    "kind": "import",
+    "name": "puts",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196272,
+    "ghidra": "strcmp",
+    "file": "004007b0_strcmp.c",
+    "kind": "import",
+    "name": "strcmp",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196288,
+    "ghidra": "printf",
+    "file": "004007c0_printf.c",
+    "kind": "import",
+    "name": "printf",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196304,
+    "ghidra": "fgets",
+    "file": "004007d0_fgets.c",
+    "kind": "import",
+    "name": "fgets",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4196352,
+    "ghidra": "thunk_FUN_00400c20",
+    "file": "00400800_thunk_FUN_00400c20.c",
+    "kind": "runtime",
+    "name": "main",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196416,
+    "ghidra": "entry",
+    "file": "00400840_entry.c",
+    "kind": "runtime",
+    "name": "_start",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196480,
+    "ghidra": "FUN_00400880",
+    "file": "00400880_FUN_00400880.c",
+    "kind": "runtime",
+    "name": "_dl_relocate_static_pie",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196488,
+    "ghidra": "FUN_00400888",
+    "file": "00400888_FUN_00400888.c",
+    "kind": "runtime",
+    "name": "call_weak_fn",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196512,
+    "ghidra": "FUN_004008a0",
+    "file": "004008a0_FUN_004008a0.c",
+    "kind": "runtime",
+    "name": "deregister_tm_clones",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196560,
+    "ghidra": "FUN_004008d0",
+    "file": "004008d0_FUN_004008d0.c",
+    "kind": "runtime",
+    "name": "register_tm_clones",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196620,
+    "ghidra": "_FINI_0",
+    "file": "0040090c__FINI_0.c",
+    "kind": "runtime",
+    "name": "__do_global_dtors_aux",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196672,
+    "ghidra": "_INIT_0",
+    "file": "00400940__INIT_0.c",
+    "kind": "runtime",
+    "name": "frame_dummy",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4196704,
+    "ghidra": "FUN_00400960",
+    "file": "00400960_FUN_00400960.c",
+    "kind": "application",
+    "name": "ctf_crc32_le",
+    "module": "ctfnode",
+    "brief": "Compute the reflected crc32_le used by the node's key schedule.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4196784,
+    "ghidra": "FUN_004009b0",
+    "file": "004009b0_FUN_004009b0.c",
+    "kind": "application",
+    "name": "ctf_weak_key",
+    "module": "ctfnode",
+    "brief": "DEFECT B6 - derive the beacon key from the PUBLIC device UID.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197004,
+    "ghidra": "FUN_00400a8c",
+    "file": "00400a8c_FUN_00400a8c.c",
+    "kind": "application",
+    "name": "ctf_login",
+    "module": "ctfnode",
+    "brief": "DEFECT B4 - authenticate with hard-coded default credentials.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197084,
+    "ghidra": "FUN_00400adc",
+    "file": "00400adc_FUN_00400adc.c",
+    "kind": "phantom",
+    "name": "(phantom of FUN_00400ae0)",
+    "module": "-",
+    "evidence": "R4: identical body to FUN_00400ae0; alignment padding"
+  },
+  {
+    "addr": 4197088,
+    "ghidra": "FUN_00400ae0",
+    "file": "00400ae0_FUN_00400ae0.c",
+    "kind": "application",
+    "name": "ctf_config_run",
+    "module": "ctfnode",
+    "brief": "DEFECT B1 - source a writable config file as root.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197220,
+    "ghidra": "FUN_00400b64",
+    "file": "00400b64_FUN_00400b64.c",
+    "kind": "application",
+    "name": "ctf_build_cmd",
+    "module": "ctfnode",
+    "brief": "Build a shell command from a request string (defect B2, part 1).",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197248,
+    "ghidra": "FUN_00400b80",
+    "file": "00400b80_FUN_00400b80.c",
+    "kind": "application",
+    "name": "ctf_http_handle",
+    "module": "ctfnode",
+    "brief": "DEFECT B2 - run the command built from a request string.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197312,
+    "ghidra": "FUN_00400bc0",
+    "file": "00400bc0_FUN_00400bc0.c",
+    "kind": "application",
+    "name": "ctf_restore",
+    "module": "ctfnode",
+    "brief": "DEFECT B3 - restore an uploaded archive directly into root.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197376,
+    "ghidra": "FUN_00400c00",
+    "file": "00400c00_FUN_00400c00.c",
+    "kind": "application",
+    "name": "ctf_debug_shell",
+    "module": "ctfnode",
+    "brief": "DEFECT B5 - drop to a local root debug shell.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197388,
+    "ghidra": "FUN_00400c0c",
+    "file": "00400c0c_FUN_00400c0c.c",
+    "kind": "application",
+    "name": "ctf_banner",
+    "module": "ctfnode",
+    "brief": "Print the node banner.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197408,
+    "ghidra": "FUN_00400c20",
+    "file": "00400c20_FUN_00400c20.c",
+    "kind": "application",
+    "name": "ctf_dispatch",
+    "module": "ctfnode",
+    "brief": "Dispatch a command line to the node features.",
+    "evidence": "R1: exact nm match against the unstripped twin"
+  },
+  {
+    "addr": 4197956,
+    "ghidra": "_DT_FINI",
+    "file": "00400e44__DT_FINI.c",
+    "kind": "runtime",
+    "name": "_fini",
+    "module": "-",
+    "evidence": "R1: exact nm match (C runtime start-up)"
+  },
+  {
+    "addr": 4329472,
+    "ghidra": "strlen",
+    "file": "00421000_strlen.c",
+    "kind": "import",
+    "name": "strlen",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329480,
+    "ghidra": "__libc_start_main",
+    "file": "00421008___libc_start_main.c",
+    "kind": "import",
+    "name": "__libc_start_main",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329488,
+    "ghidra": "_ITM_deregisterTMCloneTable",
+    "file": "00421010__ITM_deregisterTMCloneTable.c",
+    "kind": "import",
+    "name": "_ITM_deregisterTMCloneTable",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329496,
+    "ghidra": "putc",
+    "file": "00421018_putc.c",
+    "kind": "import",
+    "name": "putc",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329504,
+    "ghidra": "snprintf",
+    "file": "00421020_snprintf.c",
+    "kind": "import",
+    "name": "snprintf",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329512,
+    "ghidra": "fclose",
+    "file": "00421028_fclose.c",
+    "kind": "import",
+    "name": "fclose",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329520,
+    "ghidra": "fopen",
+    "file": "00421030_fopen.c",
+    "kind": "import",
+    "name": "fopen",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329528,
+    "ghidra": "system",
+    "file": "00421038_system.c",
+    "kind": "import",
+    "name": "system",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329536,
+    "ghidra": "__gmon_start__",
+    "file": "00421040___gmon_start__.c",
+    "kind": "import",
+    "name": "__gmon_start__",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329544,
+    "ghidra": "abort",
+    "file": "00421048_abort.c",
+    "kind": "import",
+    "name": "abort",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329552,
+    "ghidra": "puts",
+    "file": "00421050_puts.c",
+    "kind": "import",
+    "name": "puts",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329560,
+    "ghidra": "strcmp",
+    "file": "00421058_strcmp.c",
+    "kind": "import",
+    "name": "strcmp",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329568,
+    "ghidra": "_ITM_registerTMCloneTable",
+    "file": "00421060__ITM_registerTMCloneTable.c",
+    "kind": "import",
+    "name": "_ITM_registerTMCloneTable",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329576,
+    "ghidra": "printf",
+    "file": "00421068_printf.c",
+    "kind": "import",
+    "name": "printf",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  },
+  {
+    "addr": 4329584,
+    "ghidra": "fgets",
+    "file": "00421070_fgets.c",
+    "kind": "import",
+    "name": "fgets",
+    "module": "lib",
+    "evidence": "R2: .plt stub / weak symbol -> import name"
+  }
+]
