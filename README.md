@@ -9,7 +9,7 @@
 
 # OPERATION TELESCREEN CTF
 
-### The Compromised Surveillance Backbone
+### The Compromised Surveillance Node
 #### The finale after OPERATION COLD IRON
 
 Capture the Flag XX - **The compromised surveillance node**
@@ -40,16 +40,20 @@ By using this repository and course, you acknowledge and agree that:
 > tidy little beacon every sixty seconds, humming off to a relay nobody in the building
 > had ever heard of.
 >
-> Then we pulled the flash and read the four images the Ministry burned into it, and we
-> stopped believing the little beacon.
+> Then we pulled the flash and found nothing - the sweep crew's kit had cooked every
+> image on the chip. Boot, environment, kernel, rootfs: a few dozen bytes of header,
+> then zeros.
 >
-> You have the images. You have a Raspberry Pi 5. What you do not have is time: the
-> sweep reaches this block at dawn.
+> But we caught the node mid-transmission, and one thing survived: **the application
+> binary**. No names. No source. Just the daemon that watches, routes, and whispers.
+>
+> You have the binary, a host, and Ghidra. What you do not have is time: the sweep
+> reaches this block at dawn.
 
 This is the companion capture-the-flag to the
 [telescreen](https://github.com/mytechnotalent/telescreen) project. Where the project
-builds the defended device, this CTF hands you the **compromised** device and asks you
-to find every backdoor, prove it, and rebuild it hardened.
+builds the defended device, this CTF hands you the **compromised** daemon and asks you
+to reverse it, find every defect, prove it, and rebuild it hardened.
 
 <br>
 
@@ -63,42 +67,57 @@ development); the acts build the Ministry's industrial edge, starting with the
 **TELESCREEN is the surveillance backbone that watches it**, and this repository
 is that backbone **captured and compromised** - the finale after OPERATION COLD
 IRON. The whole saga is **ARM** - bare-metal Cortex-M33 in the acts,
-application-class Cortex-A76 here.
+application-class Cortex-A here.
 
 | work | platform | role in the story |
 | ---- | -------- | ----------------- |
 | [OPERATION COLD IRON](https://github.com/mytechnotalent/cold-chain-monitor) | ARM Cortex-M33 (RP2350) | the Ministry's cold-chain edge - Act I (saga in development) |
 | [telescreen](https://github.com/mytechnotalent/telescreen) | ARM Cortex-A76 (Raspberry Pi 5) | the defended surveillance backbone |
-| **CTF_telescreen (this repo)** | **ARM Cortex-A76 (Raspberry Pi 5)** | **the same backbone, compromised** |
+| **CTF_telescreen (this repo)** | **ARM Cortex-A (aarch64 ELF)** | **the same daemon, compromised** |
 
 <br>
 
 ## THE MISSION
 
-`CTF-XX-full.img` is the TELESCREEN node with deliberate defects and a poisoned
-exfiltration channel. Carve the four partitions, reverse the boot chain, find the
-backdoors, break the weak key derivation, and produce a hardened image.
+`firmware/ctfnode.stripped` is the TELESCREEN node daemon with deliberate defects.
+Reverse the stripped aarch64 binary, give every function its name back, find the
+backdoors, break the weak key derivation, and produce a hardened replacement.
 
-| # | Backdoor | What the Ministry did |
-|---|----------|-----------------------|
-| B1 | Config-sourced root exec | sources a writable config as root |
-| B2 | CGI command injection | builds a shell command from a request |
-| B3 | Archive-to-root restore | `tar -xvzf <upload> -C /` as root |
-| B4 | Empty / default credentials | ships with no web password |
-| B5 | Debug root shell | leaves a local root path |
-| B6 | Weak key schedule | derives the beacon key from the public UID |
+> **No Raspberry Pi 5 - or any hardware - is required.** This CTF is a Ghidra
+> exercise. You reverse the stripped aarch64 ELF on any host; the live defect
+> harnesses run in a pinned `linux/arm64` Docker container (emulated on Windows
+> x64, Linux x64, and macOS). There is nothing to buy, flash, or boot. Ghidra plus
+> Docker is the whole lab.
+
+| # | Defect | What the Ministry did |
+|---|--------|-----------------------|
+| B1 | Config-sourced root exec | runs every `run=` line of a writable config as root |
+| B2 | Command injection | builds `ping -c 1 <query>` and `system()`s it |
+| B3 | Archive-to-root restore | runs `tar -xvzf <upload> -C /` as root |
+| B4 | Empty / default credentials | accepts `admin` with an empty password |
+| B5 | Debug root shell | leaves `system("/bin/sh")` in the production path |
+| B6 | Weak key schedule | derives the beacon key from the public UID via a reflected CRC-32 |
+
+> **Threat model:** all of these are **local** flaws in the node's own command
+> surface - reachable by invoking the daemon or influencing a file/query it consumes.
+> There is no network listener in this binary. "Remote root" is not a correct
+> description.
 
 <br>
 
 ## THE ARTIFACTS
 
 ```
-CTF-XX-full.img          the whole 16 MiB image
-CTF-XX-boot.img          partition 0 (U-Boot)
-CTF-XX-env.img           partition 1 (U-Boot environment)
-CTF-XX-kernel.img        partition 2 (vendor container -> Linux)
-CTF-XX-rootfs.img        partition 3 (JFFS2)
-CTF-XX-full_fixed.img    the hardened reference image
+firmware/ctfnode.stripped    ELF 64-bit LSB, ARM aarch64, stripped - the target
+firmware/ctfnode.unstripped  the same code with names - the instructor answer key
+ctf/ctfnode.c                the vulnerable source (instructors)
+```
+
+Artifact identity:
+
+```text
+ctfnode.stripped   af7ab5c2b4837083682db8b54f6892b1a2a33dcc8ce7b202b5a4a5163232da6d
+ctfnode.unstripped 6bcee7daa91280eaf02558b1b5f1b5cc8e22a84179605a0725af2b5564257e0a
 ```
 
 <br>
@@ -113,7 +132,7 @@ CTF-XX-full_fixed.img    the hardened reference image
 | [CTF-XX-R.md](CTF-XX-R.md) / [.pdf](CTF-XX-R.pdf) | requirements and grading |
 | [CTF-XX-S.md](CTF-XX-S.md) / [.pdf](CTF-XX-S.pdf) | instructor solution key |
 | [DESIGN.md](DESIGN.md) | the build spine (instructor-facing) |
-| [PARTS.md](PARTS.md) | bill of materials |
+| [PARTS.md](PARTS.md) | optional hardware notes (not required for the RE task) |
 
 ### Reverse-engineering the node (stripped aarch64 binary)
 
@@ -128,37 +147,28 @@ CTF-XX-full_fixed.img    the hardened reference image
 | [ctf/ctfnode.c](ctf/ctfnode.c) | the vulnerable source (instructors only) |
 | [scripts/test_consistency.py](scripts/test_consistency.py) | regression: the compiled binary's key must equal the Python tool and the published vector (run by CI) |
 | [scripts/test_defects.py](scripts/test_defects.py) | live defect harness: proves B1-B6 actually manifest (containerized, no hardware) |
+| [scripts/weak_decrypt.py](scripts/weak_decrypt.py) | reference implementation of the weak key schedule |
 | [ghidra/tests/test_resolution.py](ghidra/tests/test_resolution.py) | asserts the function-resolution invariants |
-
-### Artifacts
-
-```
-CTF-XX-full.img          the whole 16 MiB image
-CTF-XX-boot.img          partition 0 (U-Boot)
-CTF-XX-env.img           partition 1 (U-Boot environment)
-CTF-XX-kernel.img        partition 2 (vendor container -> Linux)
-CTF-XX-rootfs.img        partition 3 (JFFS2)
-CTF-XX-full_fixed.img    the hardened reference image
-CTF-XX-main-disasm.txt   AArch64 disassembly of the integrity primitives
-```
 
 ### Setup (Windows x64, Linux x64, macOS arm64)
 
 Install Docker, the JDK 21, and Ghidra 12.1.3 using the companion course:
-**`telescreen` → [docs/31-prerequisites-and-install.md](https://github.com/mytechnotalent/telescreen/blob/main/docs/31-prerequisites-and-install.md)**,
+**`telescreen` -> [docs/31-prerequisites-and-install.md](https://github.com/mytechnotalent/telescreen/blob/main/docs/31-prerequisites-and-install.md)**,
 then the lab sheets
 [docs/walkthrough/75](https://github.com/mytechnotalent/telescreen/blob/main/docs/walkthrough/75-prereqs-and-install.md),
 [76](https://github.com/mytechnotalent/telescreen/blob/main/docs/walkthrough/76-ghidra-from-zero.md), and
 [77](https://github.com/mytechnotalent/telescreen/blob/main/docs/walkthrough/77-function-resolution.md).
 
-Working on real hardware? **[Walkthrough 78 - Raspberry Pi Bring-Up (Pi 4B and
-Pi 5)](https://github.com/mytechnotalent/telescreen/blob/main/docs/walkthrough/78-raspberry-pi-bringup.md)**
-flashes the card, configures it headless, wires the serial console, and brings up
-the camera.
+<br>
 
-Want to work on a **real OpenWrt device** (the same OS family as a GL.iNet
-Mango)? **[Walkthrough 79 - A Real OpenWrt Device on the Pi](https://github.com/mytechnotalent/telescreen/blob/main/docs/walkthrough/79-openwrt-real-device.md)**
-turns the Pi into a genuine router you can practice on.
+## QUICK START
+
+```bash
+./firmware/build_target.sh            # build ctfnode.stripped + ctfnode.unstripped
+./ghidra/make_project.sh              # headless analysis -> ghidra/proj/CTFNodeRE.gpr
+python3 scripts/test_defects.py       # prove B1-B5 live
+python3 scripts/test_consistency.py   # prove B6 against the Python tool
+```
 
 <br>
 

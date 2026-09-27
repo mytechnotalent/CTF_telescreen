@@ -66,6 +66,23 @@ def load_imports() -> set[str]:
     return names
 
 
+def load_curated_briefs() -> dict[int, str]:
+    """Return {address: brief} from the previously published `resolution.json`.
+
+    The public node functions carry no Doxygen `@brief` in the source (only the
+    static helpers do), so the curated roles live in `resolution.json` and are
+    treated as the source of truth for the defect descriptions.
+    """
+    path = HERE / "resolution.json"
+    if not path.exists():
+        return {}
+    try:
+        rows = json.loads(path.read_text())
+    except (ValueError, KeyError):
+        return {}
+    return {r["addr"]: r.get("brief", "") for r in rows if r.get("brief")}
+
+
 def load_index() -> list[tuple[int, str, str]]:
     """Return [(address, ghidra_name, decomp_file)] from Ghidra's index."""
     rows = []
@@ -157,6 +174,7 @@ def resolve() -> list[dict]:
     symbols = load_symbols()
     imports = load_imports()
     sources = parse_sources()
+    curated = load_curated_briefs()
     plt0 = find_plt0()
     rows = []
     for addr, ghidra_name, cfile in load_index():
@@ -172,7 +190,7 @@ def resolve() -> list[dict]:
                              evidence="R1: exact nm match (C runtime start-up)")
             else:
                 entry.update(kind="application", name=name, module=module,
-                             brief=brief,
+                             brief=brief or curated.get(addr, ""),
                              evidence="R1: exact nm match against the unstripped twin")
         elif ghidra_name in imports or ghidra_name in WEAK:
             entry.update(kind="import", name=ghidra_name, module="lib",
@@ -247,7 +265,7 @@ def write_map(rows: list[dict]) -> None:
     lines.append("real identity, with the evidence that proves it.  Totals:")
     lines.append("")
     lines.append(f"- **{len(app)}** application functions (our firmware code)")
-    lines.append(f"- **{len(imports)}** imported-library thunks (OpenSSL / glibc)")
+    lines.append(f"- **{len(imports)}** imported-library thunks (glibc / C runtime)")
     lines.append(f"- **{len(phantom)}** phantom functions (alignment padding)")
     lines.append(f"- **{len(runtime)}** C runtime / start-up functions")
     lines.append(f"- **{len(rows)}** total functions in the binary")

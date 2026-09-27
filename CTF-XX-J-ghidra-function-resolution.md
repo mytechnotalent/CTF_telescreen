@@ -1,13 +1,13 @@
 # Appendix J - Function-by-Function Reverse Engineering
 
 This appendix is the complete reverse-engineering record of the stripped
-target `firmware/teled.stripped`.  For every one of the 42 application
+target `firmware/ctfnode.stripped`.  For every one of the 10 application
 functions it gives the address, the meaningless label Ghidra shows, what
 the function really is, the call graph around it extracted from the real
 machine code, the evidence that resolves it, and its decompiled body.
 
-Everything here is reproducible from `firmware/teled.stripped` alone plus
-the instructor's `firmware/teled.unstripped` answer key.
+Everything here is reproducible from `firmware/ctfnode.stripped` alone plus
+the instructor's `firmware/ctfnode.unstripped` answer key.
 
 > **The four resolution rules** (see `ghidra/RESOLUTION_MAP.md`):
 >
@@ -22,30 +22,35 @@ the instructor's `firmware/teled.unstripped` answer key.
 
 - **Ghidra shows:** `FUN_00400960` (a stripped binary has no names).
 - **Resolved name:** `ctf_crc32_le`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** Compute the reflected crc32_le used by the node's key schedule.
 - **Evidence:** R1: exact nm match against the unstripped twin.
 - **Called by:** _(entry points only)_
 - **Calls:** _(leaf function)_
 
 ```c
-
-void FUN_00400960(undefined8 param_1,long param_2,long param_3)
+uint FUN_00400960(uint param_1,byte *param_2,ulong param_3)
 
 {
-  int iVar1;
+  uint uVar1;
+  byte *pbVar2;
+  byte *pbVar3;
+  int iVar4;
   
   if (param_3 != 0) {
-    param_3 = param_2 + param_3;
+    pbVar3 = param_2 + param_3;
     do {
-      iVar1 = 8;
+      uVar1 = param_1 ^ *param_2;
+      iVar4 = 8;
       do {
-        iVar1 = iVar1 + -1;
-      } while (iVar1 != 0);
+        iVar4 = iVar4 + -1;
+        uVar1 = -(uVar1 & 1) & 0xedb88320 ^ uVar1 >> 1;
+      } while (iVar4 != 0);
       param_2 = param_2 + 1;
-    } while (param_3 != param_2);
+      param_1 = uVar1;
+    } while (pbVar3 != param_2);
   }
-  return;
+  return param_1;
 }
 ```
 
@@ -53,7 +58,7 @@ void FUN_00400960(undefined8 param_1,long param_2,long param_3)
 
 - **Ghidra shows:** `FUN_004009b0` (a stripped binary has no names).
 - **Resolved name:** `ctf_weak_key`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** DEFECT B6 - derive the beacon key from the PUBLIC device UID.
 - **Evidence:** R1: exact nm match against the unstripped twin.
 - **Called by (1):** `ctf_dispatch`
@@ -115,7 +120,7 @@ void FUN_004009b0(byte *param_1,long param_2)
 
 - **Ghidra shows:** `FUN_00400a8c` (a stripped binary has no names).
 - **Resolved name:** `ctf_login`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** DEFECT B4 - authenticate with hard-coded default credentials.
 - **Evidence:** R1: exact nm match against the unstripped twin.
 - **Called by:** _(entry points only)_
@@ -145,10 +150,10 @@ bool FUN_00400a8c(char *param_1,char *param_2)
 
 - **Ghidra shows:** `FUN_00400ae0` (a stripped binary has no names).
 - **Resolved name:** `ctf_config_run`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** DEFECT B1 - source a writable config file as root.
 - **Evidence:** R1: exact nm match against the unstripped twin.
-- **Called by:** _(entry points only)_
+- **Called by (1):** `ctf_dispatch`
 - **Calls (4):** `fclose@plt`, `fopen@plt`, `system@plt`, `fgets@plt`
 
 ```c
@@ -186,11 +191,11 @@ LAB_00400b44:
 
 - **Ghidra shows:** `FUN_00400b64` (a stripped binary has no names).
 - **Resolved name:** `ctf_build_cmd`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** Build a shell command from a request string (defect B2, part 1).
 - **Evidence:** R1: exact nm match against the unstripped twin.
 - **Called by:** _(entry points only)_
-- **Calls:** _(leaf function)_
+- **Calls (1):** `snprintf@plt`
 
 ```c
 
@@ -208,10 +213,10 @@ int FUN_00400b64(undefined8 param_1,char *param_2,size_t param_3)
 
 - **Ghidra shows:** `FUN_00400b80` (a stripped binary has no names).
 - **Resolved name:** `ctf_http_handle`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** DEFECT B2 - run the command built from a request string.
 - **Evidence:** R1: exact nm match against the unstripped twin.
-- **Called by:** _(entry points only)_
+- **Called by (1):** `ctf_dispatch`
 - **Calls (2):** `snprintf@plt`, `system@plt`
 
 ```c
@@ -232,10 +237,10 @@ int FUN_00400b80(undefined8 param_1)
 
 - **Ghidra shows:** `FUN_00400bc0` (a stripped binary has no names).
 - **Resolved name:** `ctf_restore`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** DEFECT B3 - restore an uploaded archive directly into root.
 - **Evidence:** R1: exact nm match against the unstripped twin.
-- **Called by:** _(entry points only)_
+- **Called by (1):** `ctf_dispatch`
 - **Calls (2):** `snprintf@plt`, `system@plt`
 
 ```c
@@ -256,11 +261,11 @@ int FUN_00400bc0(undefined8 param_1)
 
 - **Ghidra shows:** `FUN_00400c00` (a stripped binary has no names).
 - **Resolved name:** `ctf_debug_shell`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** DEFECT B5 - drop to a local root debug shell.
 - **Evidence:** R1: exact nm match against the unstripped twin.
 - **Called by:** _(entry points only)_
-- **Calls:** _(leaf function)_
+- **Calls (1):** `system@plt`
 
 ```c
 
@@ -278,11 +283,11 @@ int FUN_00400c00(void)
 
 - **Ghidra shows:** `FUN_00400c0c` (a stripped binary has no names).
 - **Resolved name:** `ctf_banner`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** Print the node banner.
 - **Evidence:** R1: exact nm match against the unstripped twin.
 - **Called by:** _(entry points only)_
-- **Calls:** _(leaf function)_
+- **Calls (1):** `puts@plt`
 
 ```c
 
@@ -300,11 +305,11 @@ int FUN_00400c0c(void)
 
 - **Ghidra shows:** `FUN_00400c20` (a stripped binary has no names).
 - **Resolved name:** `ctf_dispatch`
-- **Module:** `src/ctfnode.c`
+- **Module:** `ctf/ctfnode.c`
 - **Role:** Dispatch a command line to the node features.
 - **Evidence:** R1: exact nm match against the unstripped twin.
-- **Called by:** _(entry points only)_
-- **Calls (5):** `putc@plt`, `puts@plt`, `strcmp@plt`, `printf@plt`, `ctf_weak_key`
+- **Called by (1):** `main`
+- **Calls (9):** `putc@plt`, `system@plt`, `puts@plt`, `strcmp@plt`, `printf@plt`, `ctf_weak_key`, `ctf_config_run`, `ctf_http_handle`, `ctf_restore`
 
 ```c
 
@@ -396,17 +401,19 @@ LAB_00400c88:
 
 ## Reverse-engineering lessons this binary teaches
 
-### Lesson 1 - Identical Code Folding (ICF)
+### Lesson 1 - Static helpers are inlined away
 
-`aead_open` contains two paths whose final step is byte-for-byte
-identical.  The linker merged them, so the symbol table points two source
-functions at the SAME address:
+The source has more functions than the compiled binary.  A student who
+greps the stripped listing for a helper name will not find it, because the
+compiler inlined every `static` one:
 
-```
-```
+- `ctf_crc32_byte` is inlined into both `ctf_crc32_le` and `ctf_weak_key`,
+  so the reflected fold appears **twice** as straight-line machine code.
+- `ctf_cmd`, `ctf_print_key`, `ctf_try_path`, and `ctf_try_misc` are inlined
+  into `ctf_dispatch`, which is why the dispatcher is the largest function.
 
-Two names, one address.  A reverse engineer must read the surrounding
-code to decide which one is executing in a given path.
+Always read the call graph, not just the symbol count, before concluding a
+function is missing.
 
 ### Lesson 2 - Phantom functions on alignment padding
 
@@ -414,17 +421,17 @@ Modern toolchains align functions to 16 bytes and pad with `nop`.  Ghidra
 can mistake the padding for the start of a small function, producing a
 phantom that overlaps the real one:
 
-- `0x00401b9c` is a phantom whose body is identical to `beacon_seal`
-  (`0x00401ba0`).
-- `0x004020dc` is a phantom whose body is identical to `identity_sign`
-  (`0x004020e0`).
+- `0x00400adc` is a phantom whose body is identical to `ctf_config_run`
+  (`0x00400ae0`) sitting on the 4-byte alignment pad.
 
 Always confirm a function's true entry with the call graph and the
 prologue (`stp x29, x30, [sp, #-N]!`), never by Ghidra's guess alone.
 
-### Lesson 3 - The dual PLT (with and without pointer authentication)
+### Lesson 3 - The PLT and the GOT
 
-There are two `.plt` sections (`linux_x86_64`-style `.plt` plus `.plt.sec`),
-so each imported library function appears twice.  Both thunks end in
-`br x17`; the address they branch to is the GOT slot named by the import.
+Every imported libc function is indirected through the `.plt`: the stub
+loads a slot from `.got.plt` and branches to it (`br x17`).  The relocation
+at `0x420000`-`0x420060` names the target, so `bl 0x400770` is `system`, not
+some anonymous `FUN_`.  Reading the `.rela.plt` relocations is how a
+reverse engineer recovers library calls from a stripped binary.
 

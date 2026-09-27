@@ -45,12 +45,3 @@ target_link_libraries(telescreen
         OpenSSL::Crypto
 )
 
-# The lab's image tooling is plain Python; make the targets available from CMake.
-find_package(Python3 COMPONENTS Interpreter)
-
-add_custom_target(verify
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/scripts/verify_telescreen.py
-                --image ${CMAKE_CURRENT_LIST_DIR}/images/full.img
-        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-        COMMENT "Verifying the four-partition image layout"
-)

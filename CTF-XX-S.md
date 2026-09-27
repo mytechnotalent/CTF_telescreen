@@ -22,404 +22,424 @@ By using this repository and course, you acknowledge and agree that:
 The instructor-issued artifact hashes are:
 
 ```text
-TELESCREEN-full.img 037cc979a58f04f3285132a7b745ca859b1604aeb80c9ef62eb5377e48bd18ec
-TELESCREEN-boot.img 4193d6a9e9a29848813056f05356c17e4a4e64f8206148c86fd3b0d50a5e69fd
-TELESCREEN-env.img e935f998fd6289615d88d8d2c2d4d3aada0e04ad6dd7592c27a853431fec4d7e
-TELESCREEN-kernel.img 8a5fb5725420d79ae4e21e39e27c161b7df88dbbdbd2b061d859dd889c8b0230
-TELESCREEN-rootfs.img 38a8684afb5f8bb8b717b2ab333dc729054d36192aa6541be6e9fed6f19cd10e
+ctfnode.stripped   af7ab5c2b4837083682db8b54f6892b1a2a33dcc8ce7b202b5a4a5163232da6d
+ctfnode.unstripped 6bcee7daa91280eaf02558b1b5f1b5cc8e22a84179605a0725af2b5564257e0a
 ```
+
+`firmware/ctfnode.unstripped` is the answer key; `firmware/ctfnode.stripped` is the
+student artifact. Both are built from `ctf/ctfnode.c` by `firmware/build_target.sh`
+in a pinned `linux/arm64` container.
+
+The correct framing is the **application binary**, not the flash. The four `*.img`
+files that once appeared in this repository were empty stubs and have been removed;
+do not expect a boot chain, kernel, device tree, or `mtdparts` anywhere in this
+challenge.
 
 ---
 
-## Task 1: Carve and Identify the Four Partitions (10 points)
+## Task 1: Verify the Artifact (10 points)
 
 ### Solution
 
-#### Expected Partition Layout
+```
+$ shasum -a 256 firmware/ctfnode.stripped
+af7ab5c2b4837083682db8b54f6892b1a2a33dcc8ce7b202b5a4a5163232da6d  firmware/ctfnode.stripped
 
-The environment declares the layout; decode it from `mtdparts`:
-
-```text
-mtdparts=sfc:128K(boot),64K(bootargs),1792K(kernel),14400K(rootfs)
+$ file firmware/ctfnode.stripped
+ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked,
+interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, stripped
 ```
 
-| mtd | name | offset | size | end |
-|-----|------|--------|------|-----|
-| 0 | `boot` | `0x000000` | `0x020000` (128 KiB) | `0x020000` |
-| 1 | `bootargs` | `0x020000` | `0x010000` (64 KiB) | `0x030000` |
-| 2 | `kernel` | `0x030000` | `0x1C0000` (1792 KiB) | `0x1F0000` |
-| 3 | `rootfs` | `0x1F0000` | `0xE10000` (14400 KiB) | `0x1000000` |
+ELF identity:
 
-Coverage: `0x1F0000 + 0xE10000 = 0x1000000` - the whole 16 MiB chip.
+| property | value |
+| -------- | ----- |
+| class | ELF64 |
+| data | little-endian |
+| machine | AArch64 |
+| type | dynamic executable (`EXEC`), PIE-ready |
+| interpreter | `/lib/ld-linux-aarch64.so.1` (glibc) |
+| symbols | stripped |
 
-#### Carving
+Dynamic imports (`readelf -rW firmware/ctfnode.stripped | grep JUMP_SLOT`):
 
-```bash
-dd if=TELESCREEN-full.img of=boot.img    bs=1 count=$((0x20000))
-dd if=TELESCREEN-full.img of=env.img     bs=1 skip=$((0x20000)) count=$((0x10000))
-dd if=TELESCREEN-full.img of=kernel.img  bs=1 skip=$((0x30000)) count=$((0x1C0000))
-dd if=TELESCREEN-full.img of=rootfs.img  bs=1 skip=$((0x1F0000)) count=$((0xE10000))
+```
+strlen  __libc_start_main  putc  snprintf  fclose  fopen  system
+__gmon_start__  abort  puts  strcmp  printf  fgets
 ```
 
-#### Magic-Byte Identification
-
-| Partition | First bytes | Meaning |
-|-----------|-------------|---------|
-| `boot` | `15 05 00 ea` | ARM `B` (reset vector) at offset 0 |
-| `bootargs` | CRC32 (4 B, LE) then `baudrate=…` | U-Boot environment |
-| `kernel` | `21 84 1b 00` … `67 7a 69 70 68 65 61 64` | vendor container + `"gziphead"` |
-| `rootfs` | `85 19 03 20` | JFFS2 little-endian magic + CLEANMARKER |
+The dangerous import for this binary is **`system`**. `printf`, `puts`, `putc`,
+`strlen`, `strcmp`, `snprintf`, `fopen`, `fgets`, `fclose` are ordinary string and
+I/O helpers; `system` is the one that turns a crafted string into a shell command.
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[DOCUMENT]** Whole-image hash verified | 2 | Matches the instructor-issued hash |
-| **[DOCUMENT]** Partition table correct | 3 | Offsets `0x0/0x20000/0x30000/0x1F0000`, sizes `128K/64K/1792K/14400K`, `mtdparts` decoded |
-| **[DOCUMENT]** Magic-byte identification | 3 | All four magics correct |
-| **[DOCUMENT]** Carved files produced | 2 | Four files, correct sizes |
-
-### Instructor Notes & Assembly
-
-- The **1984 KiB pad** between the end of `kernel` and the start of `rootfs`
-  (`0x1F0000 - 0x30000 - 0x1C0000 = 0x1F0000`) is deliberate vendor padding; students
-  who "fix" the gap by shifting `rootfs` are wrong.
-- If a student identifies `boot` by the U-Boot string instead of the vectors, that is
-  acceptable, but the **vectors at offset 0** are the primary answer.
+| **[DOCUMENT]** SHA-256 verified | 3 | Matches `af7ab5c2...da6d` |
+| **[DOCUMENT]** ELF identity | 3 | ELF64, aarch64, dynamic, glibc, stripped |
+| **[DOCUMENT]** Imports flagged | 4 | All listed; `system` flagged |
 
 ---
 
-## Task 2: Reverse the Boot Chain (15 points)
+## Task 2: Recover the Command Surface (15 points)
 
 ### Solution
 
-#### First-Stage Entry
-
-The vector table at offset 0 of `boot`:
-
-```assembly
-00000000: 15 05 00 ea   b   0x145c        ; reset
-00000004: fe ff ff ea   b   .             ; undef
-00000008: fe ff ff ea   b   .             ; svc
-...
-```
-
-Reset handler entry: **`0x145c`** (relative to the `boot` partition).
-
-#### Cold-Boot Path (representative)
-
-```assembly
-0000145c:  ...            ; SVC mode, IRQ/FIQ off, VBAR=0
-000014bc:  ...            ; warm/cold magic check at 0x12020140
-000014d8:  bl 0x17e4      ; DRAM / parameter init
-000014e0:  bl 0x1ae8      ; SoC / clock init
-000014f4:  mov pc, r1     ; jump to U-Boot payload
-```
-
-#### U-Boot
+#### Entry chain
 
 ```
-U-Boot 2024.07 (telescreen-rp5)
+_start (0x400840)
+  -> __libc_start_main(main=__wrap_main 0x400874)
+       __wrap_main (0x400874):  b 0x400800        ; linker --wrap shim
+         main (0x400800):       b 0x400c20        ; tail-call
+           ctf_dispatch (0x400c20)
 ```
 
-#### Environment
+At `0x40085c`-`0x40086c`, `_start` loads `x0 = 0x400874` and calls
+`__libc_start_main@plt`, so the C entry point glibc invokes is `__wrap_main`, not
+`main` directly. `__wrap_main` is a one-instruction tail branch to `main`; `main`
+is a one-instruction tail branch to `ctf_dispatch`.
 
-Decode `bootargs` and `bootcmd` from `env.img`:
+#### Subcommand table (`ctf_dispatch`, `0x400c20`)
 
-```text
-bootargs=mem=47M console=ttyAMA0,115200 root=/dev/mtdblock3 rootfstype=jffs2 rw \
-         mtdparts=sfc:128K(boot),64K(bootargs),1792K(kernel),14400K(rootfs) lpj=9838592
-bootcmd=sf probe 0;telescreenapp;boothz 0x41000000 0x40008000 0x30000 0x1C0000
-```
+| subcommand | string address | argc rule | target |
+| ---------- | -------------- | --------- | ------ |
+| `config`   | `0x400ee8`     | `argc > 2` (needs a path) | `ctf_config_run` |
+| `http`     | `0x400ef0`     | `argc > 2` (needs a query) | `ctf_http_handle` |
+| `restore`  | `0x400ef8`     | `argc > 2` (needs an archive) | `ctf_restore` |
+| `login`    | `0x400f00`     | `argc > 3` (user + pass) | inline `strcmp` against `admin` / empty |
+| `shell`    | `0x400f08`     | `argc > 1` (no argument) | inline `system("/bin/sh")` |
+| `key`      | `0x400f10`     | `argc > 2` (needs a UID) | `ctf_weak_key` + `%02x` print |
 
-`bootcmd` decodes to: probe SPI, run the vendor pre-boot hook, then load the kernel
-from flash offset **`0x30000`** with size **`0x1C0000`** (the `kernel` partition).
+With `argc < 2`, the dispatcher prints the banner and returns 0. An unknown
+subcommand also prints the banner and returns 2.
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[DOCUMENT]** First-stage entry point | 4 | `0x145c` (reset vector target) |
-| **[DOCUMENT]** Cold-boot path traced | 4 | At least two of: `0x17e4` (DRAM), `0x1ae8` (SoC) |
-| **[DOCUMENT]** U-Boot version/build | 3 | `U-Boot 2024.07 (telescreen-rp5)` |
-| **[DOCUMENT]** `bootargs`/`bootcmd` decoded | 4 | Both strings, including `mtdparts` and the `boothz` load |
+| **[DOCUMENT]** Entry chain | 5 | `__wrap_main 0x400874 -> main 0x400800 -> ctf_dispatch 0x400c20` |
+| **[DOCUMENT]** Subcommand table | 6 | All six strings with addresses |
+| **[DOCUMENT]** Argument rules | 4 | `argc` rules as above |
 
 ### Instructor Notes & Assembly
 
-- The **BootROM is silicon** and is *not* in the image; students should not expect to
-  find it. The first bytes in the image are the **SPL** (first stage), which the
-  BootROM loads.
-- The warm/cold magic at `0x12020140` selects DRAM init; if a student notes it, award
-  full marks on the cold-boot criterion.
+- Students who stop at `main` and never open `ctf_dispatch` will miss the entire
+  command surface; the interesting code is in the dispatcher.
+- The helper functions `ctf_cmd`, `ctf_try_path`, `ctf_try_misc`, and `ctf_print_key`
+  are **inlined** into `ctf_dispatch`, which is why it is the biggest function.
 
 ---
 
-## Task 3: Inflate the Kernel and Read the Device Tree (15 points)
+## Task 3: Name Every Function (20 points)
 
 ### Solution
 
-#### Container Header (`kernel.img`)
+The ten application functions, resolved 1:1 against the unstripped twin:
 
-```text
-00000000: 21 84 1b 00   magic   0x001B8421
-00000004: 00 f0 2c 00   length  0x002CF000
-00000008: 67 7a 69 70 68 65 61 64   "gziphead"
-00000010: 1f 8b 08 08   gzip magic, FNAME flag
-0000001a: 49 6d 61 67 65 00   "Image\0"
-```
+| address | Ghidra label | resolved name | rule |
+| ------- | ------------ | ------------- | ---- |
+| `0x400960` | `FUN_00400960` | `ctf_crc32_le` | R1; also the `0xEDB88320` polynomial |
+| `0x4009b0` | `FUN_004009b0` | `ctf_weak_key` | R1; 32-iteration loop over the UID |
+| `0x400a8c` | `FUN_00400a8c` | `ctf_login` | R1; references `admin` + empty test |
+| `0x400ae0` | `FUN_00400ae0` | `ctf_config_run` | R1; `run=` compare + `system` |
+| `0x400b64` | `FUN_00400b64` | `ctf_build_cmd` | R1; `"ping -c 1 %s"` |
+| `0x400b80` | `FUN_00400b80` | `ctf_http_handle` | R1; `system` on the built command |
+| `0x400bc0` | `FUN_00400bc0` | `ctf_restore` | R1; `"tar -xvzf %s -C /"` |
+| `0x400c00` | `FUN_00400c00` | `ctf_debug_shell` | R1; `system("/bin/sh")` |
+| `0x400c0c` | `FUN_00400c0c` | `ctf_banner` | R1; the banner string |
+| `0x400c20` | `FUN_00400c20` | `ctf_dispatch` | R1; the `strcmp` chain |
 
-#### Inflate
+Non-application functions resolved by the other rules:
 
-```bash
-dd if=kernel.img bs=1 skip=16 | gunzip > Image
-# raw Image size: 2945024 bytes (0x2CF000)
-```
+- **R3** PLT0 lazy resolver at `0x4006f0`.
+- **R2** the imported glibc thunks at `0x400710`-`0x4007d0` and their `.got.plt`
+  duplicates at `0x421000`-`0x421070`.
+- **R4** the phantom `FUN_00400adc` at `0x400adc`, an alignment-pad twin of
+  `ctf_config_run`.
 
-#### Device Tree and Banner
+Inlined away (present in source, absent from the binary):
 
-```
-model = "telescreen,rp5 DEMO Board";
-compatible = "telescreen,rp5";
-```
-
-Flash-controller node (from the DTB): `telescreen,fmc` with child `telescreen,fmc-spi-nor`
-and a `sfc` node `compatible = "jedec,spi-nor"`.
-
-Kernel banner:
-
-```
-Linux version 4.9.37 (super@super-virtual-machine) (gcc version 7.3.0 (GCC))
-#1 Sat Nov 9 13:45:32 CST 2024
-```
+| helper | inlined into |
+| ------ | ------------ |
+| `ctf_crc32_byte` | `ctf_crc32_le`, `ctf_weak_key` |
+| `ctf_cmd` | `ctf_dispatch` |
+| `ctf_print_key` | `ctf_dispatch` |
+| `ctf_try_path` | `ctf_dispatch` |
+| `ctf_try_misc` | `ctf_dispatch` |
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[DOCUMENT]** Container header parsed | 5 | Magic `0x001B8421`, length, `gziphead` |
-| **[DOCUMENT]** Raw `Image` produced | 5 | Size `2945024`, first bytes `04 90 8f e2` |
-| **[DOCUMENT]** Device tree + banner | 5 | Model `telescreen,rp5 DEMO Board`, flash node, `Linux 6.6` |
+| **[DOCUMENT]** Ten functions named with rules | 14 | Table above |
+| **[DOCUMENT]** Inlined helpers | 6 | All five |
 
 ### Instructor Notes & Assembly
 
-- The container is **not** a `uImage` (`0x27051956`) or a `zImage` (`0x016F2818`); the
-  vendor tag `gziphead` is the giveaway.
-- The DTB is appended in the `kernel` partition near offset `0x1b8434` (size 12676,
-  FDT v17). Students may extract it from the partition rather than the inflated image.
+- Reference output: `ghidra/RESOLUTION_MAP.md`, `ghidra/resolution.json`, and
+  `CTF-XX-J-ghidra-function-resolution.md`.
+- Rebuild with `./firmware/build_target.sh`; open with `./ghidra/make_project.sh`
+  (`ghidra/proj/CTFNodeRE.gpr`).
 
 ---
 
-## Task 4: Open the Rootfs (15 points)
+## Task 4: Prove the Six Defects (30 points)
 
 ### Solution
 
-#### Extraction
-
-```bash
-jefferson -d rootfs rootfs.img
-```
-
-The tree contains the application, the web directory, and the config directory.
-
-#### The Two CRC Algorithms
-
-| Layer | Algorithm | Coverage |
-|-------|-----------|----------|
-| U-Boot env | `crc32` (standard, init `0xFFFFFFFF`, final xor) | the `key=value\0` blob, stored at offset 0 |
-| JFFS2 node | **`crc32_le`** (reflected, **no** init/final inversion) | `hdr_crc=node[0:8]`, `node_crc=node[0:60]`, `data_crc=data` |
-
-#### In-Place Patch (worked example)
-
-Append a higher-version INODE for the target file (`version = old + 1000`), fill the
-remainder with a PADDING node so the total length is unchanged, then recompute in
-order: `hdr_crc` -> `data_crc` -> `node_crc`.
+#### B1 - Config-Sourced Root Execution (`ctf_config_run`, `0x400ae0`)
 
 ```
-before: hdr_crc=0x…  data_crc=0x…  node_crc=0x…
-after:  hdr_crc=0x…  data_crc=0x…  node_crc=0x…   (all re-verified)
+0x400af0:  bl  400760 <fopen@plt>     ; fopen(path, "r")
+0x400afc:  mov w20, #0x7572
+0x400b04:  movk w20, #0x3d6e, lsl #16 ; w20 = 0x3d6e7572 = "run=" (LE)
+0x400b20:  cmp w1, w20                 ; is the first 4 bytes "run=" ?
+0x400b2c:  bl  400770 <system@plt>     ; system(line + 4)
 ```
+
+Any line in a readable config file beginning `run=` is executed with `system()`.
+Because the node runs as root, a writable config is a root-execution primitive.
+
+#### B2 - Command Injection (`ctf_build_cmd` `0x400b64`, `ctf_http_handle` `0x400b80`)
+
+```
+0x400b70:  adrp x2, 400000
+0x400b74:  add  x2, x2, #0xe88        ; "ping -c 1 %s"
+0x400b78:  b    400740 <snprintf@plt>
+```
+
+```
+0x400b88:  adrp x2, 400000
+0x400b8c:  add  x2, x2, #0xe88        ; "ping -c 1 %s"
+0x400ba0:  bl   400740 <snprintf@plt>
+0x400ba8:  bl   400770 <system@plt>    ; system("ping -c 1 <query>")
+```
+
+The query is interpolated into a shell command with no quoting, so shell
+metacharacters (`;`, `|`, `` ` ``, `$()`) execute.
+
+#### B3 - Archive-to-Root Restore (`ctf_restore`, `0x400bc0`)
+
+```
+0x400bc8:  adrp x2, 400000
+0x400bcc:  add  x2, x2, #0xe98        ; "tar -xvzf %s -C /"
+0x400be0:  bl   400740 <snprintf@plt>
+0x400be8:  bl   400770 <system@plt>    ; extracts the upload into /
+```
+
+An uploaded archive with `../` entries writes anywhere on the filesystem as root.
+
+#### B4 - Empty / Default Credentials (`ctf_login`, `0x400a8c`)
+
+```
+0x400ab0:  adrp x1, 400000
+0x400ab4:  add  x1, x1, #0xe68        ; "admin"
+0x400ab8:  bl   4007b0 <strcmp@plt>
+0x400ac0:  ldrb w0, [x19]              ; pass[0]
+0x400ac4:  cmp  w0, #0x0
+0x400ac8:  cset w20, eq               ; success iff pass[0] == '\0'
+```
+
+The user must be `admin` and the password must be the **empty string**. The same
+logic is duplicated inline in `ctf_dispatch` (`0x400d0c`-`0x400d40`).
+
+#### B5 - Debug Root Shell (`ctf_debug_shell`, `0x400c00`)
+
+```
+0x400c00:  adrp x0, 400000
+0x400c04:  add  x0, x0, #0xeb0        ; "/bin/sh"
+0x400c08:  b    400770 <system@plt>
+```
+
+The dispatcher reaches an equivalent tail call at `0x400d58`-`0x400d6c`.
+
+#### B6 - Weak Key Schedule (`ctf_weak_key`, `0x4009b0`)
+
+```
+0x4009c4:  bl   400710 <strlen@plt>    ; ulen = strlen(uid)
+0x4009d4:  mov  w3, #0x8320
+0x4009e0:  movk w3, #0xedb8, lsl #16   ; w3 = 0xEDB88320 (reflected poly)
+0x4009f0:  ... reflected fold: c = (c>>1) ^ ((c&1) ? poly : 0)
+0x400a10:  mov  x6, #0x0
+0x400a70:  strb w1, [x20, x6]          ; emit low byte of residual
+0x400a78:  cmp  x6, #0x20              ; 32 rounds
+```
+
+A reflected CRC-32 (polynomial `0xEDB88320`, no final XOR) is folded over the UID,
+then re-folded 32 times; each round emits the low byte. The key is a pure function
+of a **public** identifier.
+
+#### Threat model
+
+All four `system()` defects (B1, B2, B3, B5) are **local**: they require invoking the
+daemon or influencing a file/query it consumes. There is no network listener in the
+binary. The challenge is the **file/argument-to-root-exec primitive** and the
+**public-identifier key**, not a remote exploit.
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[DOCUMENT]** Rootfs extracted | 4 | Application + web dir + config dir listed |
-| **[DOCUMENT]** CRC algorithms compared | 6 | Both named; JFFS2 uses `crc32_le` (no init/final), env uses standard CRC32 |
-| **[DOCUMENT & PATCH]** In-place patch verified | 5 | Patch with before/after CRC values for all three JFFS2 CRCs |
+| **[DOCUMENT]** B1 | 5 | `0x400ae0`, `run=` compare, `system` |
+| **[DOCUMENT]** B2 | 5 | `"ping -c 1 %s"` + `system` |
+| **[DOCUMENT]** B3 | 5 | `"tar -xvzf %s -C /"` + `system` |
+| **[DOCUMENT]** B4 | 5 | `admin` + empty password |
+| **[DOCUMENT]** B5 | 5 | `system("/bin/sh")` |
+| **[DOCUMENT]** B6 | 5 | reflected fold + 32 rounds |
+| **[DOCUMENT]** Threat model | - | local, not remote |
 
 ### Instructor Notes & Assembly
 
-- The most common error is using zlib's CRC for JFFS2. If the patched node fails to
-  mount, this is why.
-- Accept a patch that stores the replacement **uncompressed** (`compr=0`) as long as the
-  total node length is preserved and the CRCs verify.
+- B1-B5 are proven live by `scripts/test_defects.py`; B6 by
+  `scripts/test_consistency.py`.
+- Award full B3 credit for an end-to-end crafted archive even if the student does
+  not name the exact function.
 
 ---
 
-## Task 5: Find the Backdoors (20 points)
+## Task 5: Break the Weak Key Schedule (20 points)
 
 ### Solution
 
-#### B1 - Config-Sourced Root Execution
-
-The init script sources a writable configuration file **as root**:
-
-```sh
-# /etc/starts -> /mnt/mtd/ipc/run
-. $WIFIPATH          # sources /mnt/mtd/ipc/conf/wifi.conf as root
-```
-
-Exploit: any write to that config file executes as root on the next boot.
-
-#### B2 - CGI Dispatcher Command Injection
-
-The HTTP dispatcher (`HI_CGI_Interface` in the application) routes internal `*.cgi`
-endpoints. One handler builds a shell command from a request parameter and calls
-`system()`. Exploit: `GET /<route>?...` with shell metacharacters -> root command
-execution.
-
-#### B3 - Archive-to-Root Restore
-
-The restore handler stages an uploaded archive and runs:
-
-```sh
-tar -xvzf /mnt/mtd/ipc/tmpfs/config_restore.bin -C /
-```
-
-Exploit: an archive containing `../` entries writes anywhere on the filesystem **as
-root**. The path is fixed; the injection is the **archive contents**.
-
-#### B4 - Credential Store
-
-The web credential file is empty and the device ships default credentials; the login
-succeeds with defaults or no password.
-
-#### B5 - Debug Root Shell
-
-A debug path (a script or a service) provides a root shell locally (e.g. a serial
-getty or a triggered shell). Exploit: local/console root.
-
-### Grading Rubric (1-to-1 Mapping)
-
-| Criterion | Points | Full Credit (Answer Key) |
-|-----------|--------|-------------|
-| **[DOCUMENT]** B1 | 4 | `. $WIFIPATH` in the init path + exploit line |
-| **[DOCUMENT]** B2 | 4 | Dispatcher + at least one `system()` site |
-| **[DOCUMENT]** B3 | 4 | `tar ... -C /` + network reachability proof |
-| **[DOCUMENT]** B4 | 4 | Empty/default credential store demonstrated |
-| **[DOCUMENT]** B5 | 4 | Debug shell + trigger |
-
-### Instructor Notes & Assembly
-
-- B2 and B3 are the highest-value remote-root bugs; B1 is the design flaw that makes
-  "config write" equal "root exec".
-- If a student proves B3 end-to-end with a crafted archive, award the full B3 points
-  even if they do not name the exact function.
-
----
-
-## Task 6: Break the Exfiltration Crypto (15 points)
-
-### Solution
-
-#### The Key Schedule
-
-The beacon key is derived by **MD5 over a concatenation of device identifiers**:
+#### The key schedule
 
 ```c
-sprintf(buf, "%s&%s*%s", id1, id2, id3);
-HI_P2P_MD5_Get(buf, md5hex);          /* 32 hex chars */
-/* a selection loop reduces md5hex into the key bytes */
+/* ctf_crc32_le: reflected CRC-32, polynomial 0xEDB88320, no final XOR. */
+uint32_t c = seed;
+while (len--) c = fold(c, *data++);
+
+/* ctf_weak_key */
+uint32_t s = ctf_crc32_le(0, uid, strlen(uid));   /* initial hash over the UID */
+for (int i = 0; i < 32; ++i) {
+    s = ctf_crc32_le(s, uid, strlen(uid));        /* re-fold the UID */
+    out[i] = s & 0xFF;                            /* emit the low byte */
+}
 ```
 
-i.e. `key = f(MD5("id1 & id2 * id3"))`. Because the identifiers are **public** (printed
-on the device / readable in the config), the key is **derivable by anyone**.
+So `key = bytes 0..31 of (CRC32_le^32( public_UID ))`, low byte per round. The seed
+is 0 and there is **no** final inversion (this is the JFFS2-style `crc32_le`, not
+`zlib.crc32`).
 
-#### Decryptor (worked example)
+#### Sample vector
 
-```python
-import hashlib
-def key_for(id1, id2, id3):
-    return hashlib.md5(f"{id1}&{id2}*{id3}".encode()).hexdigest()
+For `UID = SSAT-468547-FEEBD`:
+
+```
+da506e04af00c6f40394d2cd2295bfc8682e8b9f9e9b844cea50c08d5f483141
 ```
 
-Running the decryptor on a captured beacon yields the readable telemetry.
+Reproduce it exactly with the reference tool:
+
+```bash
+$ python3 scripts/weak_decrypt.py --uid SSAT-468547-FEEBD
+da506e04af00c6f40394d2cd2295bfc8682e8b9f9e9b844cea50c08d5f483141
+```
 
 #### 200-Word Analysis (answer key)
 
 A key derived from a public identifier is **obfuscation, not encryption**. The
 confidentiality of a cipher rests entirely on the secrecy of its key; if the key is a
 deterministic function of data an attacker already has (the device's public ID, a
-serial, a broadcast DID), then the attacker can recompute the key and decrypt every
-message. The cipher may be strong - even AES - and the scheme still provides **zero
-confidentiality**. This is the failure in the TELESCREEN exfiltration channel: the
-"sealed" payloads are sealed with a key that the device hands out in the clear.
-Correcting it requires a **secret** key: either a pre-shared secret provisioned out of
-band, or a per-session key agreed with a real key-exchange (X25519) and derived with a
-KDF (HKDF). Integrity must also be provided by an **AEAD** so forged beacons are
-rejected. Anything less is theatre.
+serial, a broadcast DID), then the attacker can recompute the key and decrypt - or
+forge - every message. The cipher may be strong, even AES, and the scheme still
+provides **zero confidentiality**, because the attacker never needs to break the
+cipher. This is the failure in the TELESCREEN exfiltration channel: the "sealed"
+payloads are sealed with a key the device hands out in the clear. Correcting it
+requires a **secret** key: either a pre-shared secret provisioned out of band, or a
+per-session key agreed with a real key exchange (X25519) and derived with a KDF
+(HKDF). Integrity must also be provided by an **AEAD** so forged beacons are rejected
+at the tag. Anything less is theatre.
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[DOCUMENT]** Key schedule recovered | 6 | `key = f(MD5(id1 & id2 * id3))` |
-| **[PATCH]** Decryptor works | 5 | Decrypts a captured beacon to readable telemetry |
-| **[DOCUMENT]** 200-word analysis | 4 | Explains that a public-ID key gives no confidentiality |
-
-### Instructor Notes & Assembly
-
-- The MD5 here is a **reduction step**, not the vulnerability by itself; the
-  vulnerability is the **public key source**.
-- Award full marks for a correct formula in any equivalent notation.
+| **[DOCUMENT]** Derivation | 8 | poly `0xEDB88320`, seed 0, 32 low-byte rounds, no final XOR |
+| **[PATCH]** Sample reproduced | 6 | `da506e04...8341` |
+| **[DOCUMENT]** 200 words | 6 | public-ID key gives no confidentiality |
 
 ---
 
-## Task 7: Build the RP5 TELESCREEN-Lab (10 points)
+## Task 6: Demonstrate the Defects Locally (15 points)
 
 ### Solution
 
-#### Four-Partition Layout
-
-Lay out the RP5 image store with the **same offsets and sizes**:
+```bash
+$ python3 scripts/test_defects.py
+PASS B1 config-sourced root exec
+PASS B2 CGI command injection
+PASS B3 archive-to-root restore
+PASS B4 default credentials accepted
+PASS B4 wrong password rejected
+PASS B5 debug root shell
+FAILURES=0
+```
 
 ```
-boot      0x000000  128 KiB
-bootargs  0x020000   64 KiB
-kernel    0x030000 1792 KiB
-rootfs    0x1F0000 14400 KiB
+$ python3 scripts/test_consistency.py
+PASS python tool == published vector
+PASS stripped binary == published vector
+PASS python tool == stripped binary
+python: da506e04af00c6f40394d2cd2295bfc8682e8b9f9e9b844cea50c08d5f483141
+binary: da506e04af00c6f40394d2cd2295bfc8682e8b9f9e9b844cea50c08d5f483141
+3/3 checks, 0 failures
 ```
 
-#### Boot
-
-Build/boot U-Boot on RP5; have it load the `kernel` container from the store, inflate
-it, and jump to the Linux `Image`. The kernel command line carries the same `mtdparts`.
-
-#### Router Proof
-
-`wlan0` in AP mode (hostapd) + `eth0` WAN + NAT. A client associates and receives DHCP
-through the AP, then reaches the WAN.
-
-#### AEAD Proof
-
-Replace the weak beacon with **AES-256-GCM** (ARMv8 crypto extensions). A forged frame
-is rejected at the authentication tag.
+| check | what it proves |
+| ----- | -------------- |
+| B1 pass | a `run=` line in a config file creates a file as the node user |
+| B2 pass | a `; touch` in the query creates a file |
+| B3 pass | a `tar` entry lands at `/tmp/d3` after the restore path |
+| B4 accept + reject | `admin`/empty is accepted and a wrong password is not |
+| B5 pass | the shell echoes input, so `/bin/sh` executed |
+| consistency | the binary's `key` output equals the Python tool and the vector |
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[PATCH]** Four-partition layout reproduced | 3 | Same offsets/sizes as the TELESCREEN |
-| **[PATCH]** RP5 boots the image | 3 | Serial shows U-Boot -> Linux -> app |
-| **[DOCUMENT]** Router proof | 2 | Client gets DHCP via the AP and reaches WAN |
-| **[DOCUMENT]** AEAD proof | 2 | Beacon is AES-256-GCM; forged frame rejected |
+| **[PATCH]** `test_defects.py` | 6 | All checks PASS |
+| **[PATCH]** `test_consistency.py` | 5 | 3/3 checks, 0 failures |
+| **[DOCUMENT]** Interpretation | 4 | One sentence per check |
+
+---
+
+## Task 7: Write the Hardened Replacement (15 points)
+
+### Solution
+
+| defect | hardened behaviour |
+| ------ | ------------------ |
+| B1 | never source config as root; parse a fixed schema and dispatch an allow-list of typed actions in-process |
+| B2 | replace `system()` with `execvp("ping", {"ping","-c","1",query,NULL})`; never build a command string |
+| B3 | reject absolute paths and any `..` entry; extract into a private staging dir, verify, then move with dropped privileges |
+| B4 | remove the default `admin`/empty credential; require a provisioned secret and rate-limit |
+| B5 | compile the debug shell out of production (`#ifdef`), and drop privileges before any shell |
+| B6 | replace the public-ID KDF with X25519 ECDH + HKDF-SHA256 + AES-256-GCM |
+
+AEAD design:
+
+```
+key source : X25519(device_ephemeral, collector_static) -> HKDF-SHA256 -> 32-byte key
+cipher     : AES-256-GCM (ARMv8 crypto extensions)
+nonce      : 96-bit, per message, never reused under one key
+integrity  : 128-bit GCM tag; forged frames are rejected before parse
+```
+
+### Grading Rubric (1-to-1 Mapping)
+
+| Criterion | Points | Full Credit (Answer Key) |
+|-----------|--------|-------------|
+| **[DOCUMENT]** Six fixes | 9 | Table above |
+| **[DOCUMENT]** AEAD design | 6 | X25519 + HKDF + AES-256-GCM, nonce + tag |
 
 ### Instructor Notes & Assembly
 
-- The **format parity** is the point: if the RP5 image cannot be carved by the same
-  `dd` commands as the camera, the task is not complete.
-- Accept either AES-256-GCM or XChaCha20-Poly1305 for the AEAD proof, provided nonce
-  discipline is demonstrated.
+- Accept XChaCha20-Poly1305 in place of AES-256-GCM if nonce discipline is shown.
+- The point of B6 is the **key source**, not the cipher; a student who keeps the
+  public UID but wraps AES around it has missed the lesson.
 
 ---
 
@@ -427,101 +447,29 @@ is rejected at the authentication tag.
 
 ### Solution
 
+- **Output/process detection:** alert on `system`-class execution from a daemon
+  (`execsnoop`/`auditd`), on writes to the config file that feed `run=`, and on the
+  `admin`/empty login in auth logs.
 - **Beacon detection:** periodicity/jitter analysis on outbound flows; payload-entropy
-  analysis; flag the fixed collector endpoint.
-- **Backdoor detection:** monitor the sourced config file for writes; block/lock the
-  restore endpoint; alert on `system()`-invoking config changes; audit the credential
-  store.
-- **Field hardening:** secure boot + signed images; remove default credentials; replace
-  the public-ID KDF with a secret-key AEAD; read-only rootfs with signed updates.
+  analysis; flag the fixed collector endpoint; compare against a known-good baseline.
+- **Field hardening:** secure boot with a signed image; remove default credentials;
+  replace the public-ID KDF with a secret-key AEAD; mount the rootfs read-only and
+  require signed updates.
 
 ### Grading Rubric (1-to-1 Mapping)
 
 | Criterion | Points | Full Credit (Answer Key) |
 |-----------|--------|-------------|
-| **[DOCUMENT]** Beacon detection | 4 | Periodicity + entropy, with a concrete method |
-| **[DOCUMENT]** Backdoor detection | 3 | At least two concrete indicators |
+| **[DOCUMENT]** Output/process detection | 4 | `system` sites, `run=` writes, default login |
+| **[DOCUMENT]** Beacon detection | 3 | Periodicity + entropy, concrete |
 | **[DOCUMENT]** Field hardening | 3 | Secure boot, signed images, key management |
-
----
-
-## Written Analyses (Q1-Q3)
-
-### Q1 - The Tradecraft Parallel (5 points)
-
-Full credit: specific parallels to real backdoored cameras/routers; explains why a
-"sealed" channel built on a public-ID key fails.
-
-### Q2 - Ethics and Law (5 points)
-
-Full credit: balanced; discusses authorisation, proportionality, and disclosure.
-
-### Q3 - Defensive Recommendations (5 points)
-
-Full credit: one hardware, one firmware, one operational measure, each specific.
-
----
-
-## Task 6 - Reverse the Stripped Node Binary (25 points)
-
-### Solution
-
-The node application is `firmware/ctfnode.stripped` - a stripped Linux aarch64
-ELF. Every defect is a named function in the source and a `FUN_00xxxxxx` in the
-binary. This is the mapping the student must recover with Ghidra.
-
-| defect | function | address | stripped label | how it is found |
-| ------ | -------- | ------- | -------------- | --------------- |
-| B6 | `ctf_weak_key` | `0x004009b0` | `FUN_004009b0` | calls `ctf_crc32_le` in a 32-iteration loop over the UID |
-| B4 | `ctf_login` | `0x00400a8c` | `FUN_00400a8c` | references the strings `admin` and `""`; two `strcmp` calls |
-| B1 | `ctf_config_run` | `0x00400ae0` | `FUN_00400ae0` | contains the literal `run=` and calls `system` |
-| B2 | `ctf_build_cmd` | `0x00400b64` | `FUN_00400b64` | `snprintf(..., "ping -c 1 %s", value)` |
-| B2 | `ctf_http_handle` | `0x00400b80` | `FUN_00400b80` | calls `ctf_build_cmd` then `system` |
-| B3 | `ctf_restore` | `0x00400bc0` | `FUN_00400bc0` | `snprintf(..., "tar -xvzf %s -C /", ...)` then `system` |
-| B5 | `ctf_debug_shell` | `0x00400c00` | `FUN_00400c00` | `system("/bin/sh")` |
-| - | `ctf_crc32_le` | `0x00400960` | `FUN_00400960` | the `0xEDB88320` polynomial constant |
-| - | `ctf_banner` | `0x00400c0c` | `FUN_00400c0c` | the string `TELESCREEN node - the wall unit sees you` |
-| - | `ctf_dispatch` | `0x00400c20` | `FUN_00400c20` | `strcmp` chain on `argv[1]`; calls every feature |
-
-### Method (the four resolution rules)
-
-- **R1** exact address match against `firmware/ctfnode.unstripped` (the key),
-- **R2** `.plt` stub -> `JUMP_SLOT` -> import name (`system`, `snprintf`, `strcmp`,
-  `fopen`, `fgets`, ...),
-- **R3** the `.plt` PLT0 resolver (here `0x004006f0`),
-- **R4** phantom functions on alignment padding.
-
-Note `ctf_crc32_byte` does **not** appear as a function: the compiler inlined it
-into `ctf_crc32_le`. Recognising inlining is part of the task.
-
-> **Key check:** the weak KDF uses the **JFFS2‑style `crc32_le`** (reflected,
-> **no** final XOR). The expected key for the demo UID `SSAT-468547-FEEBD` is
-> `da506e04af00c6f40394d2cd2295bfc8682e8b9f9e9b844cea50c08d5f483141`, and
-> `scripts/weak_decrypt.py --uid SSAT-468547-FEEBD` reproduces it.
-
-### Grading Rubric (1-to-1 Mapping)
-
-| points | for |
-| ------ | --- |
-| 10 | every application function named and tied to a rule (R1-R4) |
-| 10 | each defect B1-B6 located at its address with the offending call shown |
-| 5 | the `system` / `snprintf` / `strcmp` import cross-references documented |
-
-### Instructor Notes & Assembly
-
-- Reference output: `ghidra/RESOLUTION_MAP.md`,
-  `CTF-XX-J-ghidra-function-resolution.md`, and `ghidra/proj/CTFNodeRE.gpr`.
-- Rebuild the target with `./firmware/build_target.sh`; open with
-  `./ghidra/make_project.sh`.
-- The CTF node is intentionally free of stack canaries only in spirit; the
-  defects are logic flaws, not memory corruption, so a canary would not help.
 
 ---
 
 ## Reference Material
 
-- ARM Cortex-A76 TRM; ARMv8-A Cryptography Extensions
+- ARMv8-A Architecture Reference Manual (A64 instruction set)
+- ELF64 / SysV AArch64 ABI; `.rela.plt` relocations
 - Ghidra: [https://ghidra-sre.org/](https://ghidra-sre.org/)
-- JFFS2 (`mtd-utils`, `jffs2dump`)
-- U-Boot environment / `mtdparts`
 - NIST SP 800-38D (GCM); RFC 8439 (ChaCha20-Poly1305); RFC 7748 (X25519)
+- `scripts/weak_decrypt.py`, `scripts/test_defects.py`, `scripts/test_consistency.py`

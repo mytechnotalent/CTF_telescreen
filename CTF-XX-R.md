@@ -23,23 +23,26 @@ By using this repository and course, you acknowledge and agree that:
 
 You are an embedded reverse engineer in the Brotherhood signals lab. The Party has
 deployed four million TELESCREEN units - combined surveillance cameras and wireless
-routers - each running the **same four-partition firmware** (`boot`, `bootargs`,
-`kernel`, `rootfs`). Your mission is to reverse engineer the captured image, expose
-every backdoor, break the exfiltration cryptography, and build a **Raspberry Pi 5
-replica** that boots the *same four-partition layout* with a hardened **AES-256-GCM**
-channel.
+routers - all running the **same node daemon**. The flash from the captured unit did
+not survive, but the **application binary did**: you hold it as a stripped Linux
+aarch64 ELF, `firmware/ctfnode.stripped`. Your mission is to reverse it, name every
+function, expose the six deliberate defects (B1-B6), break the weak exfiltration key
+schedule, and write the hardened replacement.
 
-**This is an application-class project.** The target is a real Linux system on a
-Cortex-A SoC (the TELESCREEN is a BCM2712; the replica is a BCM2712). There is
-**no bare metal**, no Pico, no `.uf2`. The four partitions, the U-Boot environment, the
-vendor kernel container, and the JFFS2 rootfs are **identical in format** to the
-TELESCREEN.
+**This is an application-class reverse-engineering project.** The target is a real
+Linux ELF on ARM Cortex-A (aarch64), dynamically linked against glibc. There is
+**no bare metal**, no Pico, no `.uf2`, and no boot chain to reconstruct. The whole
+task is the daemon binary and the six logic flaws inside it.
 
-This project covers the full embedded-security arc: flash layout and partitioning, ARM
-first-stage boot, U-Boot and the CRC-protected environment, the vendor kernel
-container, the device tree, JFFS2 nodes and `crc32_le`, the userland boot chain, the
-HTTP dispatcher and `system()` injection, backdoor classes, weak key derivation versus
-AEAD, building an RP5 router, and blue-team detection.
+This project covers the application-security arc: artifact identity, dynamic-import
+recovery, entry-point and dispatcher recovery, function resolution (R1-R4), compiler
+inlining and phantom functions, unsafe `system()` call sites, a public-identifier key
+schedule, live defect demonstration in a container, and a real AEAD hardening.
+
+> **Threat model, stated accurately.** Every defect is a **local** flaw: it needs
+> the ability to invoke the daemon or to influence the file/query it is handed. There
+> is no network listener in this binary. "Unauthenticated remote root" is **not** a
+> correct description and will not receive credit.
 
 ---
 
@@ -47,18 +50,17 @@ AEAD, building an RP5 router, and blue-team detection.
 
 Upon completion of this project, you will demonstrate the ability to:
 
-1. Carve a whole-flash image into the four partitions and identify each by **magic bytes**
-2. Trace an **ARM application-class boot chain** from the first stage to the application
-3. Read a **CRC-protected U-Boot environment** and decode `bootargs`/`bootcmd`
-4. Parse the **vendor kernel container** and inflate it to a raw ARM `Image`
-5. Extract and read a **device tree blob** and the kernel command line
-6. Read and write **JFFS2** using **`crc32_le`** with correct CRC discipline
-7. Reverse a stripped **ARM Cortex-A application** in Ghidra and locate the dispatcher and `system()` sites
-8. Explain why **key derivation from public identifiers is not encryption**, and contrast it with **AEAD**
-9. Build an **RP5 router** (Wi-Fi AP + Ethernet WAN, NAT, DHCP/DNS)
-10. Reproduce the **four-partition layout on RP5** and boot a real Linux kernel from it
-11. Detect and defend against **beaconing, backdoors, and weak key derivation**
-12. Analyse the **ethical and legal dimensions** of surveillance-device research
+1. Verify a captured binary by **SHA-256** and by **ELF identity**
+2. Recover **library calls** from a stripped binary's `.plt`/`.got` relocations
+3. Recover the **entry chain** and a **subcommand dispatcher** from machine code
+4. Apply the four **function-resolution rules** (R1-R4) to name every `FUN_`
+5. Recognise **compiler inlining** and **phantom functions on alignment padding**
+6. Identify unsafe **`system()` sites** and state the correct **threat model**
+7. Recover a **reflected CRC-32 key schedule** and explain why a public-identifier
+   key is not encryption
+8. Replace a weak KDF with **X25519 + HKDF + AES-256-GCM**
+9. Demonstrate each defect locally with the supplied harnesses
+10. Analyse the **ethical and legal dimensions** of surveillance-device research
 
 ---
 
@@ -69,13 +71,13 @@ points for the corresponding task.
 
 | # | Deliverable | Format | Task |
 |---|------------|--------|------|
-| 1 | Partition table (offset/size/name) + magic-byte identification for all four partitions + the decoded `mtdparts` string | Inside `TELESCREEN-Answers.md` | Task 1 |
-| 2 | Boot-chain analysis: first-stage entry point, cold-boot call addresses, U-Boot version/build string, decoded `bootargs`/`bootcmd` | Inside `TELESCREEN-Answers.md` | Task 2 |
-| 3 | Kernel container header table, raw `Image` size, device-tree machine model + flash node, kernel banner | Inside `TELESCREEN-Answers.md` | Task 3 |
-| 4 | Rootfs tree summary, the two CRC algorithms compared, and your in-place JFFS2 patch with before/after CRC values | Inside `TELESCREEN-Answers.md` | Task 4 |
-| 5 | Backdoor catalogue **B1-B5**: address/offset, code or script, one-line exploit path each | Inside `TELESCREEN-Answers.md` | Task 5 |
-| 6 | Crypto break: the key-derivation formula, a working decryptor, and a 200-word analysis | Inside `TELESCREEN-Answers.md` | Task 6 |
-| 7 | RP5 lab: four-partition image layout, U-Boot configuration, router proof (a client getting DHCP through the AP), and the AEAD beacon proof | Inside `TELESCREEN-Answers.md` | Task 7 |
+| 1 | Artifact identity: SHA-256 comparison, ELF table, dynamic-import list with the dangerous imports flagged | Inside `TELESCREEN-Answers.md` | Task 1 |
+| 2 | Command surface: entry chain, subcommand table with string addresses, argument rules | Inside `TELESCREEN-Answers.md` | Task 2 |
+| 3 | Function map: address -> `FUN_` -> real name -> rule for all ten application functions, plus the inlined-helper list | Inside `TELESCREEN-Answers.md` | Task 3 |
+| 4 | Defect catalogue **B1-B6**: address, function, the offending call, one-line exploit path, threat-model note | Inside `TELESCREEN-Answers.md` | Task 4 |
+| 5 | Crypto break: the derivation formula, the sample-UID vector, your reproduction, and a 200-word analysis | Inside `TELESCREEN-Answers.md` | Task 5 |
+| 6 | Harness output (`test_defects.py`, `test_consistency.py`) with a one-line interpretation per check | Inside `TELESCREEN-Answers.md` | Task 6 |
+| 7 | Hardened replacement: the six fixes plus the AEAD design | Inside `TELESCREEN-Answers.md` | Task 7 |
 | 8 | Defensive playbook (bonus) | Inside `TELESCREEN-Answers.md` | Task 8 |
 | 9 | Full submission packaged as `lastname-firstname-TELESCREEN.zip` | ZIP | - |
 
@@ -85,14 +87,15 @@ points for the corresponding task.
 
 | Tool | Purpose | Required For |
 |------|---------|-------------|
-| A flash dump of the TELESCREEN (or the instructor-issued `full.img`) | The artifact under analysis | Tasks 1-6 |
-| `dd`, `binwalk`, `xxd`, `strings` | Carving and identification | Task 1 |
-| `arm-none-eabi-objdump` / Ghidra | Disassembly and analysis | Tasks 2, 5, 6 |
-| `jefferson` (or a JFFS2 parser) | Rootfs extraction | Task 4 |
-| Python 3 | Tooling, the decryptor, verification | Tasks 1, 4, 6 |
-| Raspberry Pi 5 + microSD/NVMe + U-Boot + a Linux build host | The teaching replica | Task 7 |
-| USB-UART adapter | Boot console (115200 8N1) | Tasks 2, 7 |
-| Wi-Fi client device | Prove the AP hands out DHCP | Task 7 |
+| The instructor-issued `firmware/ctfnode.stripped` | The artifact under analysis | Tasks 1-6 |
+| Docker Desktop / Engine | Runs the aarch64 binary and harnesses | Tasks 5, 6 |
+| JDK 21 + Ghidra 12.1.3 | Static analysis | Tasks 2-4 |
+| `readelf`, `aarch64-linux-gnu-objdump`, `aarch64-linux-gnu-nm`, `strings` | Relocations, disassembly, symbols, strings | Tasks 1-4 |
+| Python 3 | The key tool, the harnesses, verification | Tasks 5, 6 |
+| A text editor | `TELESCREEN-Answers.md` | All |
+
+> **No hardware is required.** The defects are logic flaws; the harnesses prove them
+> inside the pinned `linux/arm64` container.
 
 ---
 
@@ -101,119 +104,121 @@ points for the corresponding task.
 The instructor-issued artifact hashes are:
 
 ```text
-TELESCREEN-full.img 037cc979a58f04f3285132a7b745ca859b1604aeb80c9ef62eb5377e48bd18ec
-TELESCREEN-boot.img 4193d6a9e9a29848813056f05356c17e4a4e64f8206148c86fd3b0d50a5e69fd
-TELESCREEN-env.img e935f998fd6289615d88d8d2c2d4d3aada0e04ad6dd7592c27a853431fec4d7e
-TELESCREEN-kernel.img 8a5fb5725420d79ae4e21e39e27c161b7df88dbbdbd2b061d859dd889c8b0230
-TELESCREEN-rootfs.img 38a8684afb5f8bb8b717b2ab333dc729054d36192aa6541be6e9fed6f19cd10e
+ctfnode.stripped   af7ab5c2b4837083682db8b54f6892b1a2a33dcc8ce7b202b5a4a5163232da6d
+ctfnode.unstripped 6bcee7daa91280eaf02558b1b5f1b5cc8e22a84179605a0725af2b5564257e0a
 ```
 
-> The real hashes are published with the instructor-issued image. Verify them before
-> you begin; a mismatch means you are analysing the wrong artifact.
+> `ctfnode.unstripped` is the instructor answer key and is not part of the student
+> artifact. Verify the stripped hash before you begin; a mismatch means you are
+> analysing the wrong binary.
 
 ---
 
 ## Grading Rubric - Detailed Breakdown
 
-### Task 1: Carve and Identify the Four Partitions (10 points)
+### Task 1: Verify the Artifact (10 points)
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** Whole-image hash verified | 2 | In `Answers.md`, the hash matches the instructor-issued value | Hash computed but not compared | Not done |
-| **[DOCUMENT]** Partition table correct | 3 | In `Answers.md`, all four partitions with correct offset **and** size, and the decoded `mtdparts` string | Offsets correct, sizes missing | Not found |
-| **[DOCUMENT]** Magic-byte identification | 3 | In `Answers.md`, the correct magic for each partition (`boot` vectors, `env` CRC+text, `kernel` `21 84 1b 00`, `rootfs` `85 19 03 20`) | 2-3 magics correct | 0-1 correct |
-| **[DOCUMENT]** Carved files produced | 2 | Four carved files exist and are the correct sizes | Some files produced | None |
+| **[DOCUMENT]** SHA-256 verified | 3 | Computed hash matches the instructor-issued value | Hash computed but not compared | Not done |
+| **[DOCUMENT]** ELF identity correct | 3 | `ELF 64-bit LSB, ARM aarch64`, dynamically linked, glibc interpreter, stripped | Class/machine only | Not done |
+| **[DOCUMENT]** Imports listed | 4 | All dynamic imports listed; `system` flagged as the dangerous one for this binary | Imports listed, none flagged | Not done |
 
 ---
 
-### Task 2: Reverse the Boot Chain (15 points)
-
-**Objective:** Trace the device from power-on to the kernel hand-off.
+### Task 2: Recover the Command Surface (15 points)
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** First-stage entry point identified | 4 | In `Answers.md`, the reset-vector entry address documented (vector table at offset 0) | Entry region noted, address wrong | Not found |
-| **[DOCUMENT]** Cold-boot path traced | 4 | In `Answers.md`, at least two DRAM/SoC initialisation call addresses documented | One call documented | None |
-| **[DOCUMENT]** U-Boot version/build string | 3 | In `Answers.md`, the exact version and build string recorded | Version only | Not found |
-| **[DOCUMENT]** `bootargs`/`bootcmd` decoded | 4 | In `Answers.md`, both decoded, including the `mtdparts` string and the kernel load command | One of the two decoded | Neither |
+| **[DOCUMENT]** Entry chain recovered | 5 | `_start -> __libc_start_main -> __wrap_main (0x400874) -> main (0x400800) -> ctf_dispatch (0x400c20)` | Two of the hops | Not found |
+| **[DOCUMENT]** Subcommand table | 6 | All six strings (`config`, `http`, `restore`, `login`, `shell`, `key`) with addresses | 3-5 correct | 0-2 correct |
+| **[DOCUMENT]** Argument rules | 4 | Per-subcommand `argc` requirements read from the `cmp`/`ccmp` instructions | Partial | Not found |
 
 ---
 
-### Task 3: Inflate the Kernel and Read the Device Tree (15 points)
+### Task 3: Name Every Function (20 points)
+
+**Objective:** Name all ten application functions and cite a proving rule for each.
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** Container header parsed | 5 | In `Answers.md`, the magic, the length field, and the `gziphead` tag documented | Some fields | Not found |
-| **[DOCUMENT]** Raw `Image` produced | 5 | In `Answers.md`, the inflated size and first bytes recorded; file produced | Inflated but size wrong | Not inflated |
-| **[DOCUMENT]** Device tree + banner | 5 | In `Answers.md`, the machine model, the flash-controller node, and the kernel version/build string | Partial | Not found |
+| **[DOCUMENT]** Address -> name -> rule table | 14 | All ten functions correctly named, each with a valid rule (R1-R4) | 6-9 correct | 0-5 correct |
+| **[DOCUMENT]** Inlined helpers identified | 6 | All five inlined helpers named and their host functions given | 3-4 correct | 0-2 correct |
+
+The ten functions and their addresses:
+
+| address | name |
+| ------- | ---- |
+| `0x400960` | `ctf_crc32_le` |
+| `0x4009b0` | `ctf_weak_key` |
+| `0x400a8c` | `ctf_login` |
+| `0x400ae0` | `ctf_config_run` |
+| `0x400b64` | `ctf_build_cmd` |
+| `0x400b80` | `ctf_http_handle` |
+| `0x400bc0` | `ctf_restore` |
+| `0x400c00` | `ctf_debug_shell` |
+| `0x400c0c` | `ctf_banner` |
+| `0x400c20` | `ctf_dispatch` |
 
 ---
 
-### Task 4: Open the Rootfs (15 points)
+### Task 4: Prove the Six Defects (30 points)
+
+**Objective:** Locate and prove B1-B6 with instruction-level evidence.
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** Rootfs extracted | 4 | In `Answers.md`, the application, web directory, and config directory listed | Partial tree | Not extracted |
-| **[DOCUMENT]** CRC algorithms compared | 6 | In `Answers.md`, the U-Boot env CRC32 and the JFFS2 `crc32_le` both named and contrasted | One named | Neither |
-| **[DOCUMENT & PATCH]** In-place patch verified | 5 | In `Answers.md`, the patch with before/after `hdr_crc`/`data_crc`/`node_crc` values | Patch done, CRCs not shown | No patch |
+| **[DOCUMENT]** B1 | 5 | `ctf_config_run` at `0x400ae0`; `fopen`, `run=` word compare, `system` all cited | Site only | Not found |
+| **[DOCUMENT]** B2 | 5 | `ctf_build_cmd`/`ctf_http_handle`; `ping -c 1 %s` + `system` cited | One site only | Not found |
+| **[DOCUMENT]** B3 | 5 | `ctf_restore` at `0x400bc0`; `tar -xvzf %s -C /` + `system` cited | Site only | Not found |
+| **[DOCUMENT]** B4 | 5 | `ctf_login` at `0x400a8c`; `strcmp(user,"admin")` + empty-password test cited | One half | Not found |
+| **[DOCUMENT]** B5 | 5 | `ctf_debug_shell` at `0x400c00`; `system("/bin/sh")` + dispatcher path cited | Site only | Not found |
+| **[DOCUMENT]** B6 | 5 | `ctf_weak_key` at `0x4009b0`; reflected fold + 32-iteration loop cited | Partial | Not found |
+| **[DOCUMENT]** Threat model | - | Correctly labelled **local**, not remote; no over-claim | Minor over-claim | "Remote root" claim |
+
+> The threat-model note is a **correctness gate**: a submission that describes these
+> as unauthenticated remote exploitable cannot exceed 60% on Task 4.
 
 ---
 
-### Task 5: Find the Backdoors (20 points)
-
-**Objective:** Locate and explain the exploit path for B1-B5.
+### Task 5: Break the Weak Key Schedule (20 points)
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** B1 - config-sourced root exec | 4 | In `Answers.md`, the init path and the sourced config file, with the exploit path | Path found, no exploit line | Not found |
-| **[DOCUMENT]** B2 - CGI dispatcher command injection | 4 | In `Answers.md`, the dispatcher address and at least one `system()` site it reaches | Dispatcher or site only | Not found |
-| **[DOCUMENT]** B3 - archive-to-root restore | 4 | In `Answers.md`, the `tar ... -C /` site and the proof it is network-reachable | Site only | Not found |
-| **[DOCUMENT]** B4 - credential store | 4 | In `Answers.md`, the credential file and the empty/default login demonstrated | File only | Not found |
-| **[DOCUMENT]** B5 - debug shell | 4 | In `Answers.md`, the shell and its trigger documented | Shell only | Not found |
+| **[DOCUMENT]** Derivation recovered | 8 | Polynomial `0xEDB88320`, seed 0, initial hash over UID, 32 rounds emitting the low byte; no final XOR | Method named, details wrong | Not found |
+| **[PATCH]** Sample reproduced | 6 | `SSAT-468547-FEEBD` yields `da506e04af00c6f40394d2cd2295bfc8682e8b9f9e9b844cea50c08d5f483141` | Runs, wrong output | Not submitted |
+| **[DOCUMENT]** 200-word analysis | 6 | Explains that a public-identifier key provides no confidentiality | Partial | Not addressed |
 
 ---
 
-### Task 6: Break the Exfiltration Crypto (15 points)
+### Task 6: Demonstrate the Defects Locally (15 points)
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** Key-derivation schedule recovered | 6 | In `Answers.md`, the exact formula (e.g. `key = f(MD5(id1 & id2 * id3))`) | Method named, formula wrong | Not found |
-| **[PATCH]** Decryptor works | 5 | Grader runs your decryptor on a captured beacon and obtains readable telemetry | Decryptor runs but output wrong | Not submitted |
-| **[DOCUMENT]** 200-word analysis | 4 | Articulates why a key derived from a public identifier provides no confidentiality | Partial | Not addressed |
+| **[PATCH]** `test_defects.py` run | 6 | All B1-B5 checks pass; output pasted | Partial run | Not run |
+| **[PATCH]** `test_consistency.py` run | 5 | Binary key, Python tool, and published vector all agree | Partial | Not run |
+| **[DOCUMENT]** Interpretation | 4 | One correct sentence per check | Partial | None |
 
 ---
 
-### Task 7: Build the RP5 TELESCREEN-Lab (10 points)
+### Task 7: Write the Hardened Replacement (15 points)
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[PATCH]** Four-partition layout reproduced | 3 | Grader confirms the RP5 image carves into `boot`/`bootargs`/`kernel`/`rootfs` with the **same offsets and sizes** | Layout present, offsets wrong | Not done |
-| **[PATCH]** RP5 boots the image | 3 | Serial console shows U-Boot -> Linux -> the application | Boots to U-Boot only | Does not boot |
-| **[DOCUMENT]** Router proof | 2 | A Wi-Fi client obtains DHCP through the AP and reaches the WAN | AP up, no DHCP | Not done |
-| **[DOCUMENT]** AEAD proof | 2 | The beacon is now AES-256-GCM; a forged frame is rejected at the tag | AEAD used, no forgery test | Not done |
+| **[DOCUMENT]** Six fixes | 9 | Each defect has a correct, specific fix | 3-5 correct | 0-2 correct |
+| **[DOCUMENT]** AEAD design | 6 | X25519 + HKDF + AES-256-GCM, per-message nonce, tag verification, key source | Partial | Not addressed |
 
 ---
 
 ### Task 8: The Defensive Playbook (bonus, 10 points)
 
-**Requirement:** A one-page blue-team playbook covering detection of the beacon, the
-backdoors, and the weak key derivation, plus field hardening.
+**Requirement:** A one-page blue-team playbook covering detection and field hardening.
 
 | Criterion | Points | Full Credit | Partial Credit | No Credit |
 |-----------|--------|-------------|----------------|-----------|
-| **[DOCUMENT]** Beacon detection is specific | 4 | Names periodicity/jitter analysis and payload-entropy analysis with a concrete method | Generic "watch the network" | Not addressed |
-| **[DOCUMENT]** Backdoor detection is specific | 3 | Names at least two concrete indicators (e.g. the sourced config, the restore endpoint) | One indicator | Not addressed |
-| **[DOCUMENT]** Field hardening is practical | 3 | Names specific measures (secure boot, signed images, key management) with justification | Generic | Not addressed |
-
----
-
-### Written Analyses (Q1-Q3)
-
-| Criterion | Points | Full Credit | Partial Credit | No Credit |
-|-----------|--------|-------------|----------------|-----------|
-| **Q1** The tradecraft parallel (300 words) | 5 | Draws specific parallels between this device and real-world backdoored cameras/routers, and explains why "sealed" channels fail | Generic comparison | Not addressed |
-| **Q2** Ethics and law (300 words) | 5 | Balanced analysis; discusses authorisation, proportionality, and disclosure | One-sided | Not addressed |
-| **Q3** Defensive recommendations (3 proposals) | 5 | One hardware, one firmware, one operational measure, each specific | 1-2 specific | Not addressed |
+| **[DOCUMENT]** Output/process detection | 4 | Names concrete indicators (`system` call sites, `run=` config writes, default `admin`/empty login) | One indicator | Not addressed |
+| **[DOCUMENT]** Beacon detection | 3 | Periodicity/entropy analysis with a concrete method | Generic | Not addressed |
+| **[DOCUMENT]** Field hardening | 3 | Secure boot, signed updates, secret-key AEAD, read-only rootfs, each justified | Generic | Not addressed |
 
 ---
 
@@ -223,65 +228,53 @@ These are the most frequent mistakes. Avoid them.
 
 | Pitfall | Consequence | How to Avoid |
 |---------|-------------|--------------|
-| Treating the kernel as a `zImage`/`uImage` | You will not find `0x016F2818` or `0x27051956`; you will think the image is corrupt | Parse the **vendor container** (`21 84 1b 00` + `"gziphead"` + gzip `"Image"`) |
-| Using zlib's CRC for JFFS2 | Your patched node fails to mount; the file is ignored | JFFS2 uses **`crc32_le`** (reflected, no init/final inversion) |
-| Editing the U-Boot environment without fixing the CRC | U-Boot falls back to built-in defaults; your edit is ignored | Recompute the leading **CRC32(LE)** over the env blob |
-| Looking for `.cgi` files on the filesystem | Only two are real files; the rest are internal routes | Treat the HTTP dispatcher as code, not files |
-| Searching for `system()` calls in the wrong binary | You will miss the injection sites | Follow the dispatcher to the application's `system()` sites |
-| Assuming "AES" means "secure" | The Ministry's key is derived from a public ID | Ask **where the key comes from**, not which cipher is used |
-| Reusing a GCM nonce in the lab | Catastrophic forgery; you have taught the wrong lesson | One nonce per message, never reused |
-| Changing JFFS2 node length | All subsequent nodes shift; the filesystem is corrupt | Replace with the **same total length** (INODE + PADDING) |
+| Calling the defects "remote root" | Factually wrong; capped grade | There is no listener; they are **local** file/argument flaws |
+| Trusting Ghidra's `FUN_` labels as if named | You will document guesses | Resolve with R1-R4; cite the rule |
+| Looking for `ctf_crc32_byte` as a function | You will think the binary is corrupt | It is **inlined** into `ctf_crc32_le` and `ctf_weak_key` |
+| Treating `0x400adc` as a real function | Your totals and table are wrong | It is a **phantom** on the alignment pad of `0x400ae0` |
+| Using a standard CRC-32 (with final XOR) for B6 | Key output will not match | The node uses reflected `crc32_le` with **no** final inversion |
+| Describing `main` as the libc entry | Wrong entry chain | `__wrap_main` (`0x400874`) is what glibc calls; it jumps to `main` |
+| Ignoring `strcmp` in the dispatcher | You will miss the inline login path | Read `ctf_dispatch` fully; it inlines the small helpers |
+| Reusing a GCM nonce in your fix | Catastrophic forgery | One nonce per message, never reused |
 
 ---
 
-## How To Bench the RP5 Replica
+## The Container Bench
 
-Wire and configure the replica exactly as follows:
+Everything runs in the pinned `linux/arm64` image, so the results are identical on
+Windows x64, Linux x64, and macOS arm64:
 
-- **Image store (microSD or NVMe):**
-  - Lay out four partitions at the locked offsets: `boot` (128 KiB), `bootargs` (64 KiB),
-    `kernel` (1792 KiB), `rootfs` (14400 KiB). Leave the vendor pad before `rootfs`.
-- **WAN:**
-  - Ethernet (`eth0`) to the lab uplink (or the local collector).
-- **LAN / AP:**
-  - On-board Wi-Fi (`wlan0`) in AP mode via `hostapd`.
-- **Console:**
-  - USB-UART on the debug header, **115200 8N1**, to watch U-Boot -> Linux -> app.
+```bash
+./firmware/build_target.sh            # build the target (+ native smoke test)
+python3 scripts/test_defects.py       # B1-B5 live
+python3 scripts/test_consistency.py   # B6 vs the Python tool and the vector
+```
 
-**CRITICAL REMINDER:** Keep the lab **isolated**. The collector (`lab-sink`) is **local**.
-Do not bridge the replica's WAN to any production network.
+**CRITICAL REMINDER:** keep the work **isolated**. Do not point the harnesses at any
+network or production system; they run only inside the disposable container.
 
 ---
 
-## Partition / Memory Reference
+## Key Constants Reference
 
-| Partition | Offset | Size | Magic / identifier |
-|-----------|--------|------|--------------------|
-| `boot` | `0x000000` | 128 KiB | ARM vectors at offset 0; U-Boot string inside |
-| `bootargs` | `0x020000` | 64 KiB | CRC32 (LE) then `key=value\0` text |
-| `kernel` | `0x030000` | 1792 KiB | `21 84 1b 00` + `gziphead` + gzip `Image` |
-| `rootfs` | `0x1F0000` | 14400 KiB | `85 19 03 20` (JFFS2 little-endian) |
-
-### Key Constants Reference
-
-| Constant | Value | Purpose |
+| Constant | Value | Meaning |
 |----------|-------|---------|
-| `MTD_BOOT_OFF` | `0x000000` | boot partition offset |
-| `MTD_BOOTARGS_OFF` | `0x020000` | environment partition offset |
-| `MTD_KERNEL_OFF` | `0x030000` | kernel partition offset |
-| `MTD_ROOTFS_OFF` | `0x1F0000` | rootfs partition offset |
-| `CONTAINER_MAGIC` | `0x001B8421` | vendor kernel container |
-| `JFFS2_MAGIC` | `0x1985` | JFFS2 little-endian magic |
-| `JFFS2_CLEANMARKER` | `0x2003` | first node type |
-| `JFFS2_ERASEBLK` | `0x10000` | 64 KiB erase block |
+| `CTF_POLY` | `0xEDB88320` | reflected CRC-32 polynomial |
+| `B1_WORD` | `0x3D6E7572` | little-endian `run=` compare in `ctf_config_run` |
+| `B2_FMT` | `ping -c 1 %s` | format string in `ctf_build_cmd`/`ctf_http_handle` |
+| `B3_FMT` | `tar -xvzf %s -C /` | format string in `ctf_restore` |
+| `B5_STR` | `/bin/sh` | argument to `system` in `ctf_debug_shell` |
+| `B4_USER` | `admin` | hard-coded user in `ctf_login` |
+| `B6_ROUNDS` | `32` | key bytes emitted by `ctf_weak_key` |
 
 ---
 
 ## Deadline & Submission
 
 - This is a **take-home final project**. See the course syllabus for the due date.
-- **Submission Format:** create a folder holding all deliverables (`TELESCREEN-Answers.md`,
-  the Ghidra screenshot(s), the carved images, your decryptor, and the RP5 image layout).
+- **Submission Format:** create a folder holding all deliverables
+  (`TELESCREEN-Answers.md`, the harness output, your key tool, and your hardened
+  design notes).
 - ZIP this folder and name it: `lastname-firstname-TELESCREEN.zip`.
   - **Example:** if your name is Kevin Thomas, your file must be exactly `thomas-kevin-TELESCREEN.zip`.
 - Late submissions: see the syllabus late-work policy.
@@ -299,20 +292,20 @@ Do not bridge the replica's WAN to any production network.
 | B  | 84-86% | 84-86 |
 | B- | 80-83% | 80-83 |
 | C  | 70-79% | 70-79 |
-| F  | 0-70% | 0-70 |
+| F  | 0-70% | 0-70% |
 
 **Partial Credit Policy**
 
 | Scenario | Credit |
 |----------|--------|
-| Correct concept and approach, wrong specific offset or byte value | 75% of task points |
-| Identified the partition/location correctly but the patch is incorrect | 60% of task points |
-| Explained the concept correctly but could not locate it in the image | 40% of task points |
-| Patched correctly but could not explain why the fix works | 50% of task points |
+| Correct concept and approach, wrong address or byte value | 75% of task points |
+| Identified the function correctly but the evidence is incomplete | 60% of task points |
+| Explained the concept correctly but could not locate it in the binary | 40% of task points |
+| Fixed correctly but could not explain why the fix works | 50% of task points |
 | Documented the analysis process thoroughly even though the result is wrong | 30% of task points |
-| Three partitions carved, one missing | 70% of Task 1 points |
-| RP5 boots but the router does not hand out DHCP | 50% of Task 7 points |
-| Beacon uses AEAD but nonce discipline is not demonstrated | 40% of the AEAD criterion |
+| Missed one of the ten application functions | 85% of Task 3 points |
+| Harnesses run but interpretation is missing | 70% of Task 6 points |
+| AEAD chosen but no nonce discipline shown | 40% of the AEAD criterion |
 
 ---
 
@@ -329,10 +322,9 @@ By submitting this final project, you certify that:
 
 ## Reference Material
 
-- ARM Cortex-A76 Technical Reference Manual
-- ARMv8-A Cryptography Extensions (AES/SHA/PMULL)
+- ARMv8-A Architecture Reference Manual (A64 instruction set)
+- ELF64 and the SysV AArch64 ABI
 - Ghidra documentation: [https://ghidra-sre.org/](https://ghidra-sre.org/)
-- JFFS2 format (Linux `mtd-utils` / `jffs2dump`)
-- U-Boot environment and `mtdparts` documentation
-- NIST SP 800-38D (GCM) and RFC 8439 (ChaCha20-Poly1305)
+- `readelf` / `objdump` documentation; the `.rela.plt` relocation format
+- NIST SP 800-38D (GCM); RFC 8439 (ChaCha20-Poly1305); RFC 7748 (X25519)
 - OpenIPC / Xiongmai camera-firmware research (prior art)

@@ -4,7 +4,7 @@ Every function Ghidra found in the stripped target, resolved to a
 real identity, with the evidence that proves it.  Totals:
 
 - **10** application functions (our firmware code)
-- **28** imported-library thunks (OpenSSL / glibc)
+- **28** imported-library thunks (glibc / C runtime)
 - **1** phantom functions (alignment padding)
 - **11** C runtime / start-up functions
 - **50** total functions in the binary

@@ -1,6 +1,13 @@
-# TELESCREEN RP5 Lab - Parts and Requirements
+# TELESCREEN - Parts and Requirements
 
-**What you actually need to run the CTF, what is optional, and what the camera adds.**
+**This CTF needs no hardware.** The challenge is reverse-engineering the stripped
+`firmware/ctfnode.stripped` binary. You need a host machine, Docker, JDK 21 + Ghidra,
+and Python 3 - nothing else.
+
+> The RP5 / router / camera material below is **optional legacy companion-lab
+> content** inherited from the `telescreen` project. It is **not** part of this
+> challenge; the four-partition / U-Boot / JFFS2 framing described in older revisions
+> of the CTF documents has been removed because those artifacts were empty stubs.
 
 ***
 **LEGAL DISCLAIMER:**
@@ -35,13 +42,17 @@ router, the backdoors, and the crypto exercises.
 > The RP5's **on-board Wi-Fi (CYW43455)** is AP-capable, so a **stock RP5 already does
 > Wi-Fi + router**. You do **not** need extra radios for the core lab.
 
-## 2. Required for the full four-partition / flash lab
+## 2. Legacy notes (not part of this CTF)
+
+The former four-partition / flash lab and its image-tooling scripts have been
+removed; the artifacts they produced were empty stubs and the challenge no longer
+uses them. Use `firmware/build_target.sh` (Docker, `linux/arm64`) for everything in
+this CTF.
 
 | item | role | notes |
 |------|------|-------|
-| A host Linux machine | build the images | or build on the RP5 itself |
-| `mkfs.jffs2`, `gzip`, Python 3 | `scripts/build_images.py` | from `mtd-utils` |
-| (optional) NVMe + M.2 HAT | faster image store | SD works fine |
+| A host machine | reverse-engineer the ELF | Linux/macOS/Windows |
+| Docker | build + run the aarch64 target | pinned `linux/arm64` |
 
 ## 3. Optional - the camera lab (`docs/25-rp5-as-a-camera.md`)
 

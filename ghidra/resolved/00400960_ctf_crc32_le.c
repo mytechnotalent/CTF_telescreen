@@ -1,19 +1,23 @@
-
-void FUN_00400960(undefined8 param_1,long param_2,long param_3)
+uint FUN_00400960(uint param_1,byte *param_2,ulong param_3)
 
 {
-  int iVar1;
+  uint uVar1;
+  byte *pbVar2;
+  byte *pbVar3;
+  int iVar4;
   
   if (param_3 != 0) {
-    param_3 = param_2 + param_3;
+    pbVar3 = param_2 + param_3;
     do {
-      iVar1 = 8;
+      uVar1 = param_1 ^ *param_2;
+      iVar4 = 8;
       do {
-        iVar1 = iVar1 + -1;
-      } while (iVar1 != 0);
+        iVar4 = iVar4 + -1;
+        uVar1 = -(uVar1 & 1) & 0xedb88320 ^ uVar1 >> 1;
+      } while (iVar4 != 0);
       param_2 = param_2 + 1;
-    } while (param_3 != param_2);
+      param_1 = uVar1;
+    } while (pbVar3 != param_2);
   }
-  return;
+  return param_1;
 }
-

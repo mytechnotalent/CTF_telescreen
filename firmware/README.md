@@ -34,5 +34,15 @@ The node contains six defects. Each is a function in `../ctf/ctfnode.c` and a
 
 ## Prove you have the right bytes
 
-`build_target.sh` prints the SHA-256 of each file. Addresses for every function
-are in `../ghidra/RESOLUTION_MAP.md`.
+`build_target.sh` prints the SHA-256 of each file. The instructor-issued values are:
+
+```text
+ctfnode.stripped   af7ab5c2b4837083682db8b54f6892b1a2a33dcc8ce7b202b5a4a5163232da6d
+ctfnode.unstripped 6bcee7daa91280eaf02558b1b5f1b5cc8e22a84179605a0725af2b5564257e0a
+```
+
+Addresses for every function are in `../ghidra/RESOLUTION_MAP.md`.
+
+> **Note on the threat model.** B1, B2, B3, and B5 are **local** `system()` flaws
+> reachable through the node's own subcommands; there is no network listener in this
+> binary. B4 is a credential flaw and B6 is a public-identifier key schedule.

@@ -25,22 +25,30 @@ OUT = HERE.parent / "CTF-XX-J-ghidra-function-resolution.md"
 
 
 def load_disasm():
-    """Return (funcs_by_addr, calls) parsed from ground_truth/disasm.txt."""
+    """Return (funcs_by_addr, calls) parsed from ground_truth/disasm.txt.
+
+    Both `bl` (call) and unconditional `b` (tail call) are captured, because the
+    compiler emits tail calls for many of the dispatcher's edges.  Conditional
+    branches (`b.eq`, `b.ne`, ...) are excluded by requiring whitespace after the
+    mnemonic.
+    """
     funcs: dict[int, str] = {}
     calls: list[tuple[int, int]] = []
     cur = None
     fn_re = re.compile(r"^([0-9a-f]{16}) <(.+)>:")
-    bl_re = re.compile(r"\bbl\s+([0-9a-f]+) <")
+    br_re = re.compile(r"(?:^|\s)(bl?)\s+([0-9a-f]+) <")
     for line in (GT / "disasm.txt").read_text().splitlines():
         m = fn_re.match(line)
         if m:
             cur = int(m.group(1), 16)
             funcs[cur] = m.group(2)
             continue
-        m = bl_re.search(line)
+        m = br_re.search(line)
         if m and cur is not None:
-            calls.append((cur, int(m.group(1), 16)))
-    return funcs, calls
+            calls.append((cur, int(m.group(2), 16)))
+    # Keep only edges into a real function/symbol start; drop tail branches to
+    # internal basic blocks (objdump prints those as `<func+0x..>`).
+    return funcs, [(a, b) for a, b in calls if b in funcs]
 
 
 def main() -> None:
@@ -65,6 +73,14 @@ def main() -> None:
         return name_of.get(addr, f"sub_{addr:x}")
 
     rows = [r for r in rf.resolve() if r["kind"] == "application"]
+    # Prefer the curated Doxygen briefs in resolution.json (the source of truth
+    # for the roles), falling back to whatever the source parser found.
+    import json
+    curated = {r["addr"]: r.get("brief", "")
+               for r in json.loads((rf.HERE / "resolution.json").read_text())}
+    for r in rows:
+        if not r.get("brief"):
+            r["brief"] = curated.get(r["addr"], "")
     rows.sort(key=lambda r: r["addr"])
 
     out: list[str] = []
@@ -72,13 +88,13 @@ def main() -> None:
     w("# Appendix J - Function-by-Function Reverse Engineering")
     w("")
     w("This appendix is the complete reverse-engineering record of the stripped")
-    w("target `firmware/teled.stripped`.  For every one of the 42 application")
+    w("target `firmware/ctfnode.stripped`.  For every one of the 10 application")
     w("functions it gives the address, the meaningless label Ghidra shows, what")
     w("the function really is, the call graph around it extracted from the real")
     w("machine code, the evidence that resolves it, and its decompiled body.")
     w("")
-    w("Everything here is reproducible from `firmware/teled.stripped` alone plus")
-    w("the instructor's `firmware/teled.unstripped` answer key.")
+    w("Everything here is reproducible from `firmware/ctfnode.stripped` alone plus")
+    w("the instructor's `firmware/ctfnode.unstripped` answer key.")
     w("")
     w("> **The four resolution rules** (see `ghidra/RESOLUTION_MAP.md`):")
     w(">")
@@ -99,7 +115,7 @@ def main() -> None:
         w("")
         w(f"- **Ghidra shows:** `{r['ghidra']}` (a stripped binary has no names).")
         w(f"- **Resolved name:** `{name}`")
-        w(f"- **Module:** `src/{module}.c`")
+        w(f"- **Module:** `ctf/{module}.c`")
         w(f"- **Role:** {brief or '(see source)'}")
         w(f"- **Evidence:** {r['evidence']}.")
         if addr in callers:
@@ -127,29 +143,19 @@ def main() -> None:
     w("")
     w("## Reverse-engineering lessons this binary teaches")
     w("")
-    w("### Lesson 1 - Identical Code Folding (ICF)")
+    w("### Lesson 1 - Static helpers are inlined away")
     w("")
-    w("`aead_open` contains two paths whose final step is byte-for-byte")
-    w("identical.  The linker merged them, so the symbol table points two source")
-    w("functions at the SAME address:")
+    w("The source has more functions than the compiled binary.  A student who")
+    w("greps the stripped listing for a helper name will not find it, because the")
+    w("compiler inlined every `static` one:")
     w("")
-    w("```")
-    # `symbols` is keyed by address, so a folded pair would collapse; read the
-    # raw file instead and group every name that shares an address.
-    by_addr: dict[int, list[tuple[str, str]]] = {}
-    for line in (GT / "symbols.txt").read_text().splitlines():
-        parts = line.split()
-        if len(parts) >= 3:
-            by_addr.setdefault(int(parts[0], 16), []).append((parts[1], parts[2]))
-    for addr, names in sorted(by_addr.items()):
-        code = [(t, n) for t, n in names if t in ("t", "T")]
-        if len(code) > 1:
-            for t, n in code:
-                w(f"{addr:016x} {t} {n}")
-    w("```")
+    w("- `ctf_crc32_byte` is inlined into both `ctf_crc32_le` and `ctf_weak_key`,")
+    w("  so the reflected fold appears **twice** as straight-line machine code.")
+    w("- `ctf_cmd`, `ctf_print_key`, `ctf_try_path`, and `ctf_try_misc` are inlined")
+    w("  into `ctf_dispatch`, which is why the dispatcher is the largest function.")
     w("")
-    w("Two names, one address.  A reverse engineer must read the surrounding")
-    w("code to decide which one is executing in a given path.")
+    w("Always read the call graph, not just the symbol count, before concluding a")
+    w("function is missing.")
     w("")
     w("### Lesson 2 - Phantom functions on alignment padding")
     w("")
@@ -157,19 +163,19 @@ def main() -> None:
     w("can mistake the padding for the start of a small function, producing a")
     w("phantom that overlaps the real one:")
     w("")
-    w("- `0x00401b9c` is a phantom whose body is identical to `beacon_seal`")
-    w("  (`0x00401ba0`).")
-    w("- `0x004020dc` is a phantom whose body is identical to `identity_sign`")
-    w("  (`0x004020e0`).")
+    w("- `0x00400adc` is a phantom whose body is identical to `ctf_config_run`")
+    w("  (`0x00400ae0`) sitting on the 4-byte alignment pad.")
     w("")
     w("Always confirm a function's true entry with the call graph and the")
     w("prologue (`stp x29, x30, [sp, #-N]!`), never by Ghidra's guess alone.")
     w("")
-    w("### Lesson 3 - The dual PLT (with and without pointer authentication)")
+    w("### Lesson 3 - The PLT and the GOT")
     w("")
-    w("There are two `.plt` sections (`linux_x86_64`-style `.plt` plus `.plt.sec`),")
-    w("so each imported library function appears twice.  Both thunks end in")
-    w("`br x17`; the address they branch to is the GOT slot named by the import.")
+    w("Every imported libc function is indirected through the `.plt`: the stub")
+    w("loads a slot from `.got.plt` and branches to it (`br x17`).  The relocation")
+    w("at `0x420000`-`0x420060` names the target, so `bl 0x400770` is `system`, not")
+    w("some anonymous `FUN_`.  Reading the `.rela.plt` relocations is how a")
+    w("reverse engineer recovers library calls from a stripped binary.")
     w("")
     out_text = "\n".join(out) + "\n"
     OUT.parent.mkdir(parents=True, exist_ok=True)
